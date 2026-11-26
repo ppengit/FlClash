@@ -128,12 +128,8 @@ mixin RouteMotionHoldMixin<T extends StatefulWidget> on State<T> {
   Future<void> _settle() async {
     final run = ++_settleRun;
     _settling = true;
-    final scheduler = SchedulerBinding.instance;
-    if (scheduler.schedulerPhase == SchedulerPhase.postFrameCallbacks) {
-      scheduler.scheduleFrame();
-    }
     // What the route's stop starts ticks only from the next frame on.
-    await scheduler.endOfFrame;
+    await SchedulerBinding.instance.endOfFrame;
     await whenNothingAnimates();
     if (run != _settleRun || !mounted) {
       return;
