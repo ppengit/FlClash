@@ -67,6 +67,9 @@ class _CappedDebounceSetupAction extends _UnflooredDebounceSetupAction {
 
 class _OrchestratedSetupAction extends SetupAction {
   Future<void> Function(int? profileId)? beforeBuild;
+  Future<Profile?> Function(Profile? profile)? refresh;
+  Completer<AuthorizeCode>? authorization;
+  Completer<void>? authorizationStarted;
   final builtProfiles = <int?>[];
   final listenerChanges = <bool>[];
   var authorizationCalls = 0;
@@ -74,7 +77,17 @@ class _OrchestratedSetupAction extends SetupAction {
   @override
   Future<AuthorizeCode> authorizeCore() async {
     authorizationCalls++;
+    authorizationStarted?.complete();
+    final pending = authorization;
+    if (pending != null) {
+      return pending.future;
+    }
     return AuthorizeCode.success;
+  }
+
+  @override
+  Future<Profile?> refreshProfile(Profile? profile) {
+    return refresh?.call(profile) ?? super.refreshProfile(profile);
   }
 
   @override
@@ -102,9 +115,18 @@ class _OrchestratedSetupAction extends SetupAction {
   void resetCoreTraffic() {}
 }
 
+class _CommitWindowSetupAction extends _OrchestratedSetupAction {
+  void Function()? onReadyToCommit;
+
+  @override
+  void setupPassReadyToCommit() => onReadyToCommit?.call();
+}
+
 class _OrchestratedCoreAction extends CoreAction {
   var restarts = 0;
   var failAuthorizedRestart = false;
+  Completer<void>? restartGate;
+  Completer<void>? restartStarted;
 
   @override
   Future<void> initCore() async {}
@@ -112,6 +134,10 @@ class _OrchestratedCoreAction extends CoreAction {
   @override
   Future<CoreLifecycleResult> restartLifecycle() async {
     restarts++;
+    if (!(restartStarted?.isCompleted ?? true)) {
+      restartStarted!.complete();
+    }
+    await restartGate?.future;
     if (failAuthorizedRestart && restarts == 1) {
       throw StateError('authorized restart failed');
     }
@@ -1419,6 +1445,47 @@ void main() {
     }
 
     for (final running in [false, true]) {
+      test('late TUN enable during a ${running ? 'running' : 'stopped'} '
+          'restart performs the required second restart', () async {
+        final profile = Profile.normal(label: 'p');
+        final setup = _OrchestratedSetupAction();
+        final coreAction = _OrchestratedCoreAction()
+          ..restartGate = Completer<void>()
+          ..restartStarted = Completer<void>();
+        final (:container, :pushed) = orchestratedSetup(
+          [profile],
+          setup,
+          coreAction: coreAction,
+        );
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update(
+              (state) => state.copyWith(tun: state.tun.copyWith(enable: false)),
+            );
+        if (running) {
+          container.read(runTimeProvider.notifier).value = 0;
+        }
+
+        final restart = coreAction.restartCore();
+        await coreAction.restartStarted!.future;
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update(
+              (state) => state.copyWith(tun: state.tun.copyWith(enable: true)),
+            );
+        coreAction.restartGate!.complete();
+
+        expect(await restart.timeout(const Duration(seconds: 2)), isTrue);
+        expect(coreAction.restarts, 2);
+        expect(setup.authorizationCalls, 1);
+        expect(setup.builtProfiles, [profile.id]);
+        expect(pushed, ['profile-id: ${profile.id}\n']);
+        expect(setup.listenerChanges, running ? [true] : isEmpty);
+        if (running) {
+          await setup.setRunning(false);
+        }
+      });
+
       test('authorization before a ${running ? 'running' : 'stopped'} restart '
           'does not recurse into the restart worker', () async {
         final setup = _OrchestratedSetupAction();
@@ -1449,6 +1516,206 @@ void main() {
         await setup.setRunning(false);
       });
     }
+
+    test(
+      'a restart waits for authorization shared with an active apply',
+      () async {
+        final setup = _OrchestratedSetupAction()
+          ..authorization = Completer<AuthorizeCode>()
+          ..authorizationStarted = Completer<void>();
+        final coreAction = _OrchestratedCoreAction()
+          ..restartGate = Completer<void>()
+          ..restartStarted = Completer<void>();
+        final a = Profile.normal(label: 'a');
+        final b = Profile.normal(label: 'b');
+        final (:container, :pushed) = orchestratedSetup(
+          [a, b],
+          setup,
+          coreAction: coreAction,
+        );
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+
+        final apply = setup.applyProfile(force: true);
+        await setup.authorizationStarted!.future;
+        final restart = coreAction.restartCore();
+        await pumpEventQueue();
+        expect(coreAction.restarts, 0);
+
+        setup.authorization!.complete(AuthorizeCode.success);
+        await coreAction.restartStarted!.future;
+        container.read(currentProfileIdProvider.notifier).value = b.id;
+        final latest = setup.applyProfile(force: true);
+        coreAction.restartGate!.complete();
+        expect(
+          await Future.wait([
+            apply,
+            restart,
+            latest,
+          ]).timeout(const Duration(seconds: 2)),
+          everyElement(isTrue),
+        );
+        expect(setup.authorizationCalls, 1);
+        expect(coreAction.restarts, 1);
+        expect(pushed, ['profile-id: ${b.id}\n']);
+      },
+    );
+
+    test(
+      'a profile switch during granted authorization restarts for the latest '
+      'profile',
+      () async {
+        final setup = _OrchestratedSetupAction()
+          ..authorization = Completer<AuthorizeCode>()
+          ..authorizationStarted = Completer<void>();
+        final coreAction = _OrchestratedCoreAction();
+        final a = Profile.normal(label: 'a');
+        final b = Profile.normal(label: 'b');
+        final (:container, :pushed) = orchestratedSetup(
+          [a, b],
+          setup,
+          coreAction: coreAction,
+        );
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+        final first = setup.applyProfile(force: true);
+        await setup.authorizationStarted!.future;
+        container.read(currentProfileIdProvider.notifier).value = b.id;
+        final second = setup.applyProfile(force: true);
+        setup.authorization!.complete(AuthorizeCode.success);
+
+        expect(
+          await Future.wait([
+            first,
+            second,
+          ]).timeout(const Duration(seconds: 2)),
+          everyElement(isTrue),
+        );
+        expect(coreAction.restarts, 1);
+        expect(setup.authorizationCalls, 1);
+        expect(
+          container.read(authorizedTunEnableProvider),
+          TunAuthorizationState.authorized,
+        );
+        expect(setup.builtProfiles, [b.id]);
+        expect(pushed, ['profile-id: ${b.id}\n']);
+      },
+    );
+
+    test(
+      'a newer apply during granted authorization retains its restart handoff',
+      () async {
+        final profile = Profile.normal(label: 'p');
+        final setup = _OrchestratedSetupAction()
+          ..authorization = Completer<AuthorizeCode>()
+          ..authorizationStarted = Completer<void>();
+        final coreAction = _OrchestratedCoreAction();
+        final (:container, :pushed) = orchestratedSetup(
+          [profile],
+          setup,
+          coreAction: coreAction,
+        );
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+        final first = setup.applyProfile(force: true);
+        await setup.authorizationStarted!.future;
+        final latest = setup.applyProfile(force: true);
+        setup.authorization!.complete(AuthorizeCode.success);
+
+        expect(
+          await Future.wait([
+            first,
+            latest,
+          ]).timeout(const Duration(seconds: 2)),
+          everyElement(isTrue),
+        );
+        expect(coreAction.restarts, 1);
+        expect(setup.authorizationCalls, 1);
+        expect(setup.builtProfiles, [profile.id]);
+        expect(pushed, ['profile-id: ${profile.id}\n']);
+      },
+    );
+
+    test('a newer setup survives a superseded authorization failure', () async {
+      final setup = _OrchestratedSetupAction()
+        ..authorization = Completer<AuthorizeCode>()
+        ..authorizationStarted = Completer<void>();
+      final coreAction = _OrchestratedCoreAction();
+      final (:container, :pushed) = orchestratedSetup(
+        [Profile.normal(label: 'p')],
+        setup,
+        coreAction: coreAction,
+      );
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      final first = setup.applyProfile(force: true);
+      await setup.authorizationStarted!.future;
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: false));
+      var preloads = 0;
+      final second = setup.applyProfile(
+        force: true,
+        preloadInvoke: () async {
+          preloads++;
+        },
+      );
+      setup.authorization!.completeError(StateError('authorization failed'));
+
+      expect(await Future.wait([first, second]), everyElement(isTrue));
+      expect(coreAction.restarts, 0);
+      expect(pushed, hasLength(1));
+      expect(preloads, 1);
+    });
+
+    for (final afterRelease in [false, true]) {
+      test('an initializing start joining ${afterRelease ? 'after' : 'before'} '
+          'setup release keeps its preload and force', () async {
+        final setup = _CommitWindowSetupAction();
+        final (container: _, :pushed) = orchestratedSetup([
+          Profile.normal(label: 'p'),
+        ], setup);
+        Future<bool>? start;
+        void join() {
+          start = setup.setRunning(true, initialize: true);
+        }
+
+        setup.onReadyToCommit = () {
+          setup.onReadyToCommit = null;
+          if (afterRelease) {
+            scheduleMicrotask(join);
+          } else {
+            join();
+          }
+        };
+        expect(await setup.applyProfile(), isTrue);
+        expect(await start, isTrue);
+        expect(pushed, hasLength(2));
+        expect(setup.listenerChanges, [true]);
+        await setup.setRunning(false);
+      });
+    }
+
+    test(
+      'a selection changed at setup completion is applied before release',
+      () async {
+        final a = Profile.normal(label: 'a');
+        final b = Profile.normal(label: 'b');
+        final setup = _CommitWindowSetupAction();
+        final (:container, :pushed) = orchestratedSetup([a, b], setup);
+        setup.onReadyToCommit = () {
+          setup.onReadyToCommit = null;
+          container.read(currentProfileIdProvider.notifier).value = b.id;
+        };
+
+        expect(await setup.applyProfile(force: true), isTrue);
+        expect(pushed, ['profile-id: ${a.id}\n', 'profile-id: ${b.id}\n']);
+      },
+    );
 
     test(
       'a failed authorized restart releases the worker and authorization',
@@ -1534,6 +1801,66 @@ void main() {
         await setup.setRunning(false);
       },
     );
+
+    for (final switchProfile in [false, true]) {
+      test(
+        'a download superseded by ${switchProfile ? 'a selection' : 'an apply'} '
+        'keeps its metadata and newer profile edits',
+        () async {
+          final profile = Profile.normal(url: 'https://example.com/profile');
+          final other = Profile.normal(label: 'other');
+          final downloading = Completer<void>();
+          final release = Completer<void>();
+          final updatedAt = DateTime(2026, 11, 26);
+          const info = SubscriptionInfo(upload: 1, download: 2, total: 100);
+          var downloaded = false;
+          final setup = _OrchestratedSetupAction()
+            ..refresh = (candidate) async {
+              if (candidate?.id != profile.id || downloaded) {
+                return null;
+              }
+              downloading.complete();
+              await release.future;
+              await (await profile.file).writeAsString('proxies: []\n');
+              downloaded = true;
+              return profile.copyWith(
+                label: 'download.yaml',
+                subscriptionInfo: info,
+                lastUpdateDate: updatedAt,
+              );
+            };
+          final (:container, :pushed) = orchestratedSetup([
+            profile,
+            other,
+          ], setup);
+          final first = setup.applyProfile(force: true);
+          await downloading.future;
+          final edited = profile.copyWith(
+            label: 'edited',
+            selectedMap: {'Group': 'Node'},
+          );
+          container.read(profilesProvider.notifier).put(edited);
+          if (switchProfile) {
+            container.read(currentProfileIdProvider.notifier).value = other.id;
+          }
+          final second = setup.applyProfile(force: true);
+          release.complete();
+          expect(await Future.wait([first, second]), everyElement(isTrue));
+
+          final saved = container
+              .read(profilesProvider)
+              .getProfile(profile.id)!;
+          expect(saved.label, 'edited');
+          expect(saved.selectedMap, edited.selectedMap);
+          expect(saved.subscriptionInfo, info);
+          expect(saved.lastUpdateDate, updatedAt);
+          expect(await (await saved.file).readAsString(), 'proxies: []\n');
+          expect(pushed, [
+            'profile-id: ${switchProfile ? other.id : profile.id}\n',
+          ]);
+        },
+      );
+    }
 
     test(
       'a refresh failure still runs core.setupConfig and preloadInvoke',

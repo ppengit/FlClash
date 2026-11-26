@@ -969,11 +969,18 @@ void main() {
         TunAuthorizationState.unauthorized,
       );
 
-      expect(await setupAction.requestAdmin(true), isTrue);
+      var secondCompleted = false;
+      final second = setupAction.requestAdmin(true).then((value) {
+        secondCompleted = true;
+        return value;
+      });
+      await Future<void>.value();
+      expect(secondCompleted, isFalse);
       expect(setupAction.authorizationRequestCount, 1);
 
       pending.complete(AuthorizeCode.success);
       expect(await first, isFalse);
+      expect(await second, isFalse);
     });
 
     test('a failed authorization leaves tun and system DNS off', () async {
@@ -1070,6 +1077,13 @@ class _TestSetupAction extends SetupAction {
   }
 
   @override
+  Future<bool> restoreAfterCoreRestart() {
+    return wantsRunning
+        ? setRunning(true, initialize: true)
+        : applyProfile(force: true);
+  }
+
+  @override
   Future<bool> applyProfile({
     bool silence = false,
     bool force = false,
@@ -1131,6 +1145,9 @@ class _AuthorizationSetupAction extends SetupAction {
 /// granted.
 class _HandoffSetupAction extends _AuthorizationSetupAction {
   _HandoffSetupAction(super.authorizationResults);
+
+  @override
+  Future<bool> restoreAfterCoreRestart() => applyProfile(force: true);
 
   @override
   Future<bool> applyProfile({

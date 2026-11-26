@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/app_localizations.dart';
@@ -78,6 +79,21 @@ class _ApplyRecordingSetupAction extends SetupAction {
 
 class _ProfileRecordingSetupAction extends SetupAction {
   final profiles = <int?>[];
+  final checkedProfiles = <int?>[];
+  final pendingChecks = <Completer<bool>>[];
+  var applied = false;
+  var blockChecks = false;
+
+  @override
+  Future<bool> inputsApplied() {
+    checkedProfiles.add(ref.read(currentProfileIdProvider));
+    if (!blockChecks) {
+      return Future.value(applied);
+    }
+    final check = Completer<bool>();
+    pendingChecks.add(check);
+    return check.future;
+  }
 
   @override
   Future<bool> fullSetup() async {
@@ -628,6 +644,78 @@ void main() {
 
     expect(setup.profiles, [2]);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('initialization does not reapply a pending selection it already '
+      'consumed', (tester) async {
+    final setup = _ProfileRecordingSetupAction()..applied = true;
+    final container = await _pumpCoreManager(
+      tester,
+      _coreInterface(),
+      overrides: [setupActionProvider.overrideWith(() => setup)],
+    );
+    container.read(currentProfileIdProvider.notifier).value = 1;
+    await tester.pump();
+    container.read(currentProfileIdProvider.notifier).value = 2;
+    await tester.pump();
+    container.read(initProvider.notifier).value = true;
+    await tester.pump();
+    await tester.pump();
+
+    expect(setup.checkedProfiles, [2]);
+    expect(setup.profiles, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a pending replay does not apply an obsolete inputs result', (
+    tester,
+  ) async {
+    final setup = _ProfileRecordingSetupAction()..blockChecks = true;
+    final container = await _pumpCoreManager(
+      tester,
+      _coreInterface(),
+      overrides: [setupActionProvider.overrideWith(() => setup)],
+    );
+    container.read(currentProfileIdProvider.notifier).value = 1;
+    await tester.pump();
+    container.read(initProvider.notifier).value = true;
+    await tester.pump();
+    expect(setup.checkedProfiles, [1]);
+
+    container.read(currentProfileIdProvider.notifier).value = 2;
+    await tester.pump();
+    container.read(currentProfileIdProvider.notifier).value = 1;
+    await tester.pump();
+    expect(setup.checkedProfiles, [1, 2, 1]);
+    setup.pendingChecks.first.complete(false);
+    setup.pendingChecks[1].complete(false);
+    await tester.pump();
+    expect(setup.profiles, isEmpty);
+    setup.pendingChecks.last.complete(false);
+    await tester.pump();
+    expect(setup.profiles, [1]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a pending profile replay stops after the manager is disposed', (
+    tester,
+  ) async {
+    final setup = _ProfileRecordingSetupAction()..blockChecks = true;
+    final container = await _pumpCoreManager(
+      tester,
+      _coreInterface(),
+      overrides: [setupActionProvider.overrideWith(() => setup)],
+    );
+    container.read(initProvider.notifier).value = true;
+    container.read(currentProfileIdProvider.notifier).value = 1;
+    await tester.pump();
+    expect(setup.pendingChecks, hasLength(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+    setup.pendingChecks.single.complete(false);
+    await tester.pump();
+
+    expect(setup.profiles, isEmpty);
+    expect(tester.takeException(), isNull);
   });
 
   group('profile switch failure', () {

@@ -29,6 +29,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   CoreController get _core => ref.read(coreHandlerProvider);
 
   var _profileSetupPending = false;
+  var _profileSetupRevision = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +45,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     // the previous one hides the error and looks like the switch was lost.
     ref.listenManual(currentProfileIdProvider, (prev, next) {
       if (prev == next) return;
+      _profileSetupRevision++;
       _profileSetupPending = true;
       _scheduleProfileSetup();
     });
@@ -107,13 +109,32 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   }
 
   void _scheduleProfileSetup() {
-    runAfterFrame(() {
-      if (!mounted || !ref.read(initProvider) || !_profileSetupPending) {
-        return;
-      }
-      _profileSetupPending = false;
-      unawaited(ref.read(setupActionProvider.notifier).fullSetup());
-    });
+    runAfterFrame(() => unawaited(_applyPendingProfileSetup()));
+  }
+
+  Future<void> _applyPendingProfileSetup() async {
+    if (!mounted || !ref.read(initProvider) || !_profileSetupPending) {
+      return;
+    }
+    final revision = _profileSetupRevision;
+    final profileId = ref.read(currentProfileIdProvider);
+    _profileSetupPending = false;
+    final setup = ref.read(setupActionProvider.notifier);
+    final applied = await setup.inputsApplied();
+    if (!mounted) {
+      return;
+    }
+    if (revision != _profileSetupRevision ||
+        profileId != ref.read(currentProfileIdProvider)) {
+      return;
+    }
+    if (!ref.read(initProvider)) {
+      _profileSetupPending = true;
+      return;
+    }
+    if (!applied) {
+      await setup.fullSetup();
+    }
   }
 
   void _syncLogStream() {

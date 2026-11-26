@@ -122,30 +122,38 @@ class CoreAction extends _$CoreAction {
   Future<bool> _runRestartWorker() async {
     final setup = ref.read(setupActionProvider.notifier);
     var authorizedNow = false;
+    var appliedRevision = 0;
     try {
-      ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
-      authorizedNow = await setup._authorizeTunBeforeRestart();
-      final result = await restartLifecycle();
-      if (!await _applyLifecycleResult(result, statusFirst: true)) {
-        return false;
-      }
-
-      var appliedRevision = 0;
-      var applied = true;
-      while (appliedRevision < _requestedRestartRevision) {
-        final revision = _requestedRestartRevision;
-        if (ref.read(setupActionProvider.notifier).wantsRunning) {
-          applied = await ref
-              .read(setupActionProvider.notifier)
-              .setRunning(true, initialize: true);
-        } else {
-          applied = await ref
-              .read(setupActionProvider.notifier)
-              .applyProfile(force: true);
+      while (true) {
+        ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
+        authorizedNow = await setup._authorizeTunBeforeRestart();
+        final result = await restartLifecycle();
+        final restarted = await _applyLifecycleResult(
+          result,
+          statusFirst: true,
+        );
+        setup._finishTunRestart();
+        if (!restarted) {
+          return false;
         }
-        appliedRevision = revision;
+
+        var restartRequired = false;
+        var applied = true;
+        while (appliedRevision < _requestedRestartRevision) {
+          final revision = _requestedRestartRevision;
+          try {
+            applied = await setup.restoreAfterCoreRestart();
+          } on _CoreRestartRequired {
+            restartRequired = true;
+            break;
+          }
+          appliedRevision = revision;
+        }
+        if (restartRequired) {
+          continue;
+        }
+        return applied;
       }
-      return applied;
     } catch (error) {
       if (authorizedNow) {
         setup._forgetTunAuthorization();

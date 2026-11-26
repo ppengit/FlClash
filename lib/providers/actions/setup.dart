@@ -2,6 +2,8 @@ part of '../action.dart';
 
 enum _SetupTaskResult { completed, superseded, handoffToCoreRestart, failed }
 
+class _CoreRestartRequired implements Exception {}
+
 typedef _SetupInputs = (
   SetupState,
   PatchClashConfig,
@@ -22,12 +24,14 @@ class _RunRequest {
 
   /// Adopts a run the Android service has, config and groups alike.
   final bool resume;
+  final bool restoreAfterCoreRestart;
   final DateTime? previousStartTime;
 
   const _RunRequest({
     required this.running,
     required this.initialize,
     required this.resume,
+    required this.restoreAfterCoreRestart,
     required this.previousStartTime,
   });
 }
@@ -55,6 +59,8 @@ class SetupAction extends _$SetupAction {
   var _setupForce = false;
   var _setupSilence = true;
   Future<void> Function()? _setupPreload;
+  Future<bool>? _adminAuthorization;
+  var _tunRestartPending = false;
   _RunRequest? _latestRunRequest;
   Future<void>? _initialRun;
   DateTime? _startTime;
@@ -235,11 +241,13 @@ class SetupAction extends _$SetupAction {
     bool running, {
     required bool initialize,
     bool resume = false,
+    bool restoreAfterCoreRestart = false,
   }) {
     final request = _RunRequest(
       running: running,
       initialize: initialize,
       resume: resume,
+      restoreAfterCoreRestart: restoreAfterCoreRestart,
       previousStartTime: _startTime,
     );
     _latestRunRequest = request;
@@ -257,11 +265,20 @@ class SetupAction extends _$SetupAction {
     if (request.initialize) {
       var applied = false;
       try {
-        applied = await applyProfile(
-          force: !request.resume,
-          preloadInvoke: () => _startCoreRunning(request),
-        );
+        applied = request.restoreAfterCoreRestart
+            ? await _applyProfile(
+                force: !request.resume,
+                preloadInvoke: () => _startCoreRunning(request),
+                restartOwned: true,
+              )
+            : await applyProfile(
+                force: !request.resume,
+                preloadInvoke: () => _startCoreRunning(request),
+              );
       } catch (error) {
+        if (error is _CoreRestartRequired) {
+          rethrow;
+        }
         if (_isCurrent(request)) {
           dialogs.showBanner(
             userFacingErrorMessage(error, currentAppLocalizations),
@@ -510,6 +527,19 @@ class SetupAction extends _$SetupAction {
     bool silence = false,
     bool force = false,
     Future<void> Function()? preloadInvoke,
+  }) {
+    return _applyProfile(
+      silence: silence,
+      force: force,
+      preloadInvoke: preloadInvoke,
+    );
+  }
+
+  Future<bool> _applyProfile({
+    bool silence = false,
+    bool force = false,
+    Future<void> Function()? preloadInvoke,
+    bool restartOwned = false,
   }) async {
     final result = await _runSetup(
       force: force,
@@ -517,6 +547,9 @@ class SetupAction extends _$SetupAction {
       preloadInvoke: preloadInvoke,
     );
     if (result == _SetupTaskResult.handoffToCoreRestart) {
+      if (restartOwned) {
+        throw _CoreRestartRequired();
+      }
       return _restartCoreAfterAuthorization();
     }
     return result != _SetupTaskResult.failed;
@@ -537,39 +570,52 @@ class SetupAction extends _$SetupAction {
     return _setupOperation ??= _drainSetups();
   }
 
-  Future<_SetupTaskResult> _drainSetups() async {
-    try {
-      return await _setupScheduler.run(() async {
+  Future<_SetupTaskResult> _drainSetups() {
+    return _setupScheduler.run(() async {
+      try {
         while (ref.mounted) {
           final revision = _requestedSetupRevision;
           final profileId = ref.read(currentProfileIdProvider);
-          final result = await _setupConfig(
-            force: _setupForce,
-            silence: _setupSilence,
-            preloadInvoke: _setupPreload,
-            isCurrent: () =>
-                ref.mounted &&
-                revision == _requestedSetupRevision &&
-                profileId == ref.read(currentProfileIdProvider),
-            onUpdated: () async {
-              await ref.read(proxiesActionProvider.notifier).updateGroups();
-              await ref.read(providersProvider.notifier).syncProviders();
-            },
-          );
-          if (result != _SetupTaskResult.superseded) {
-            return result;
+          bool isCurrent() =>
+              ref.mounted &&
+              revision == _requestedSetupRevision &&
+              profileId == ref.read(currentProfileIdProvider);
+          final _SetupTaskResult result;
+          try {
+            result = await _setupConfig(
+              force: _setupForce,
+              silence: _setupSilence,
+              preloadInvoke: _setupPreload,
+              isCurrent: isCurrent,
+              onUpdated: () async {
+                await ref.read(proxiesActionProvider.notifier).updateGroups();
+                await ref.read(providersProvider.notifier).syncProviders();
+              },
+            );
+          } catch (_) {
+            if (!isCurrent()) {
+              continue;
+            }
+            rethrow;
           }
+          setupPassReadyToCommit();
+          if (result == _SetupTaskResult.superseded || !isCurrent()) {
+            continue;
+          }
+          return result;
         }
         return _SetupTaskResult.failed;
-      });
-    } finally {
-      // A restart applies again, so the completed setup must be released first.
-      _setupOperation = null;
-      _setupForce = false;
-      _setupSilence = true;
-      _setupPreload = null;
-    }
+      } finally {
+        _setupOperation = null;
+        _setupForce = false;
+        _setupSilence = true;
+        _setupPreload = null;
+      }
+    });
   }
+
+  @protected
+  void setupPassReadyToCommit() {}
 
   Future<bool> _restartCoreAfterAuthorization() async {
     try {
@@ -580,6 +626,14 @@ class SetupAction extends _$SetupAction {
     }
   }
 
+  @protected
+  Future<bool> restoreAfterCoreRestart() {
+    if (wantsRunning) {
+      return _run(true, initialize: true, restoreAfterCoreRestart: true);
+    }
+    return _applyProfile(force: true, restartOwned: true);
+  }
+
   /// A restart asks first, as [_setupConfig] would before handing off to it:
   /// the apply inside the restart must not hand off to the restart it runs in.
   /// Returns whether it was granted now.
@@ -587,7 +641,12 @@ class SetupAction extends _$SetupAction {
     return !await requestAdmin(ref.read(patchClashConfigProvider).tun.enable);
   }
 
+  void _finishTunRestart() {
+    _tunRestartPending = false;
+  }
+
   void _forgetTunAuthorization() {
+    _tunRestartPending = false;
     ref.read(authorizedTunEnableProvider.notifier).value =
         TunAuthorizationState.none;
   }
@@ -811,35 +870,67 @@ class SetupAction extends _$SetupAction {
     if (!enableTun || ref.read(safeModeProvider)) {
       return true;
     }
+    final activeAuthorization = _adminAuthorization;
+    if (activeAuthorization != null) {
+      return activeAuthorization;
+    }
     final authorizationState = ref.read(authorizedTunEnableProvider);
     if (authorizationState != TunAuthorizationState.none) {
-      return true;
+      return !_tunRestartPending;
     }
 
     final authorizationNotifier = ref.read(
       authorizedTunEnableProvider.notifier,
     );
+    final completer = Completer<bool>();
+    final operation = completer.future;
+    _adminAuthorization = operation;
     authorizationNotifier.value = TunAuthorizationState.unauthorized;
+    unawaited(_completeAdminAuthorization(completer, authorizationNotifier));
+    return operation;
+  }
 
-    final code = await authorizeCore();
-
-    switch (code) {
-      case AuthorizeCode.success:
-        authorizationNotifier.value = TunAuthorizationState.authorized;
-        return false;
-      case AuthorizeCode.none:
-        authorizationNotifier.value = TunAuthorizationState.authorized;
-        return true;
-      case AuthorizeCode.error:
+  Future<void> _completeAdminAuthorization(
+    Completer<bool> completer,
+    AuthorizedTunEnable authorizationNotifier,
+  ) async {
+    try {
+      final code = await authorizeCore();
+      if (!ref.mounted) {
+        completer.complete(true);
+        return;
+      }
+      switch (code) {
+        case AuthorizeCode.success:
+          authorizationNotifier.value = TunAuthorizationState.authorized;
+          _tunRestartPending = true;
+          completer.complete(false);
+          return;
+        case AuthorizeCode.none:
+          authorizationNotifier.value = TunAuthorizationState.authorized;
+          completer.complete(true);
+          return;
+        case AuthorizeCode.error:
+          authorizationNotifier.value = TunAuthorizationState.none;
+          ref
+              .read(patchClashConfigProvider.notifier)
+              .update((state) => state.copyWith.tun(enable: false));
+          dialogs.showBanner(
+            currentAppLocalizations.tunAuthorizationFailed,
+            level: BannerLevel.error,
+          );
+          completer.complete(true);
+          return;
+      }
+    } catch (error, stackTrace) {
+      if (ref.mounted) {
         authorizationNotifier.value = TunAuthorizationState.none;
-        ref
-            .read(patchClashConfigProvider.notifier)
-            .update((state) => state.copyWith.tun(enable: false));
-        dialogs.showBanner(
-          currentAppLocalizations.tunAuthorizationFailed,
-          level: BannerLevel.error,
-        );
-        return true;
+      }
+      completer.completeError(error, stackTrace);
+    } finally {
+      if (identical(_adminAuthorization, completer.future)) {
+        _adminAuthorization = null;
+      }
     }
   }
 
@@ -860,6 +951,13 @@ class SetupAction extends _$SetupAction {
     return fallback;
   }
 
+  @protected
+  Future<Profile?> refreshProfile(Profile? profile) async {
+    return profile?.checkAndUpdateAndCopy(
+      validate: (path, key) => _core.validateProfile(path, key),
+    );
+  }
+
   Future<_SetupTaskResult> _setupConfig({
     required bool Function() isCurrent,
     bool force = false,
@@ -870,16 +968,15 @@ class SetupAction extends _$SetupAction {
     var profile = ref.read(currentProfileProvider) ?? recoverMissingProfile();
     // A refresh failure is surfaced by safeRun; setup keeps the old profile.
     final nextProfile = await globalState.safeRun(
-      () => profile?.checkAndUpdateAndCopy(
-        validate: (path, key) => _core.validateProfile(path, key),
-      ),
+      () => refreshProfile(profile),
     );
-    if (!isCurrent()) {
+    if (!ref.mounted) {
       return _SetupTaskResult.superseded;
     }
     if (nextProfile != null) {
       final latest = ref.read(profilesProvider).getProfile(nextProfile.id);
       if (latest == null ||
+          latest.type != ProfileType.url ||
           latest.url != nextProfile.url ||
           latest.ageSecretKey != nextProfile.ageSecretKey) {
         return _SetupTaskResult.superseded;
@@ -890,6 +987,9 @@ class SetupAction extends _$SetupAction {
         lastUpdateDate: nextProfile.lastUpdateDate,
       );
       ref.read(profilesProvider.notifier).put(profile);
+    }
+    if (!isCurrent()) {
+      return _SetupTaskResult.superseded;
     }
     commonPrint.log('setup ===> ${profile?.realLabel}');
     final patchConfig = ref.read(patchClashConfigProvider);
