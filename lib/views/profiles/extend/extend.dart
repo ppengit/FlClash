@@ -65,7 +65,7 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
     }
   }
 
-  ({List<Object?>? inputs, bool loaded}) _watchInputs() {
+  List<Object?>? _watchInputs() {
     final profileId = widget.profileId;
     final profile = ref.watch(
       profileProvider(
@@ -74,15 +74,15 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
     );
     final rules = ref.watch(profileRulesProvider(profileId)).value;
     if (rules == null) {
-      return (inputs: null, loaded: false);
+      return null;
     }
     final disabledRuleIds = ref
         .watch(profileDisabledRuleIdsProvider(profileId))
         .value;
     if (disabledRuleIds == null) {
-      return (inputs: null, loaded: true);
+      return null;
     }
-    return (inputs: [profile, rules, disabledRuleIds], loaded: true);
+    return [profile, rules, disabledRuleIds];
   }
 
   Future<void> _handleApplyNow(List<Object?> inputs) async {
@@ -113,7 +113,7 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
-    final (:inputs, :loaded) = _watchInputs();
+    final inputs = _watchInputs();
     if (inputs != null) {
       _applied ??= inputs;
     }
@@ -123,23 +123,23 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
         inputs != null &&
         (_unappliedOnOpen ||
             !const DeepCollectionEquality().equals(_applied, inputs));
-    return ArrivalHold(
-      ready: loaded,
-      child: ProfileIdProvider(
-        profileId: widget.profileId,
-        child: Scaffold(
-          title: appLocalizations.extend,
-          isLoading: _applying,
-          actions: [
-            if (hasChanges || _applying)
-              FilledButton(
-                onPressed: _applying || inputs == null
-                    ? null
-                    : () => _handleApplyNow(inputs),
-                child: Text(appLocalizations.applyNow),
-              ),
-          ],
-          body: ScrollConfiguration(
+    return ProfileIdProvider(
+      profileId: widget.profileId,
+      child: Scaffold(
+        title: appLocalizations.extend,
+        isLoading: _applying,
+        actions: [
+          if (hasChanges || _applying)
+            FilledButton(
+              onPressed: _applying || inputs == null
+                  ? null
+                  : () => _handleApplyNow(inputs),
+              child: Text(appLocalizations.applyNow),
+            ),
+        ],
+        body: NullStatusSwitcher(
+          isLoading: inputs == null,
+          child: ScrollConfiguration(
             behavior: const ShowBarScrollBehavior(),
             child: CustomScrollView(
               slivers: [

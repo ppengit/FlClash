@@ -100,6 +100,9 @@ class _CoreContainerState extends ConsumerState<CoreManager>
       if (next == CoreStatus.connected && prev != CoreStatus.connected) {
         _syncLogStream();
       }
+      if (prev == CoreStatus.connected && next != CoreStatus.connected) {
+        ref.read(requestsProvider.notifier).closeAll();
+      }
     }, fireImmediately: true);
   }
 
@@ -179,6 +182,12 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   void onRequestTraffic(Map<String, RequestTraffic> traffic) {
     ref.read(requestsProvider.notifier).updateTraffic(traffic);
     super.onRequestTraffic(traffic);
+  }
+
+  @override
+  void onRequestsClosed(Set<String> ids) {
+    ref.read(requestsProvider.notifier).close(ids);
+    super.onRequestsClosed(ids);
   }
 
   @override

@@ -32,6 +32,17 @@ class _RunRequest {
   });
 }
 
+const _closestBeats = Duration(milliseconds: 500);
+
+int _nextRunTime(int? shown, Duration elapsed) {
+  final rounded = (elapsed.inMilliseconds / 1000).round() * 1000;
+  if (shown == null) {
+    return rounded;
+  }
+  final next = shown + 1000;
+  return (next - elapsed.inMilliseconds).abs() > 1000 ? rounded : next;
+}
+
 @Riverpod(keepAlive: true)
 class SetupAction extends _$SetupAction {
   CoreController get _core => ref.read(coreHandlerProvider);
@@ -45,14 +56,14 @@ class SetupAction extends _$SetupAction {
   var _setupSilence = true;
   Future<void> Function()? _setupPreload;
   _RunRequest? _latestRunRequest;
+  Future<void>? _initialRun;
   DateTime? _startTime;
+  DateTime? _runTimeMovedAt;
   var _resumeOnRestart = false;
   ({String digest, Set<String> names})? _outboundNames;
   _SetupInputs? _appliedInputs;
   var _lastPushDuration = Duration.zero;
   var _pendingForceApply = false;
-
-  bool get _isRunning => _startTime != null && _startTime!.isBeforeNow;
 
   @override
   void build() {
@@ -85,7 +96,9 @@ class SetupAction extends _$SetupAction {
     ref.read(delayDataSourceProvider.notifier).value = {};
     final setupResult = applyProfile(force: true);
     ref.read(logsProvider.notifier).value = FixedList(maxLogsLength);
-    ref.read(requestsProvider.notifier).value = FixedList(maxRequestsLength);
+    ref.read(requestsProvider.notifier).value = ConnectionLog(
+      maxRequestsLength,
+    );
     ref.read(dnsQueriesProvider.notifier).value = FixedList(
       maxDnsQueriesLength,
     );
@@ -134,29 +147,58 @@ class SetupAction extends _$SetupAction {
     _runtimeTimer = null;
   }
 
+  // The runtime waits for its tick's traffic, so both redraw in one frame.
   void _refreshRunningState() {
-    _updateRunTime();
-    unawaited(ref.read(commonActionProvider.notifier).updateTraffic());
+    unawaited(
+      ref
+          .read(commonActionProvider.notifier)
+          .updateTraffic()
+          .whenComplete(_updateRunTime),
+    );
   }
 
   void _updateRunTime() {
     final startTime = _startTime;
-    ref.read(runTimeProvider.notifier).value = startTime == null
-        ? null
-        : DateTime.now().millisecondsSinceEpoch -
-              startTime.millisecondsSinceEpoch;
+    final runTime = ref.read(runTimeProvider.notifier);
+    if (startTime == null) {
+      _runTimeMovedAt = null;
+      runTime.value = null;
+      return;
+    }
+    final now = DateTime.now();
+    final movedAt = _runTimeMovedAt;
+    // Starting sets it just before the first tick's read returns.
+    if (movedAt != null && now.difference(movedAt) < _closestBeats) {
+      return;
+    }
+    _runTimeMovedAt = now;
+    runTime.value = _nextRunTime(runTime.value, now.difference(startTime));
   }
 
   @protected
   Future<DateTime?> serviceStartTime() async => service?.getRunTime();
 
   Future<void> initStatus() async {
-    if (!globalState.needInitStatus) {
+    if (_initialRun == null) {
+      await _restoreStatus();
+    }
+    Future<void>? joined;
+    while (!identical(joined, _initialRun)) {
+      joined = _initialRun;
+      await joined;
+    }
+  }
+
+  Future<void> _restoreStatus() async {
+    final startTime = await serviceStartTime();
+    final running = startTime?.isBeforeNow ?? false;
+    final digest = running ? await preferences.getAppliedConfigMd5() : null;
+    if (_initialRun != null) {
       return;
     }
-    _startTime = await serviceStartTime();
-    if (_isRunning) {
-      globalState.lastConfigMd5 = await preferences.getAppliedConfigMd5();
+    _startTime = startTime;
+    if (running) {
+      globalState.lastConfigMd5 = digest;
       await _run(true, initialize: true, resume: true);
     } else if (ref.read(appSettingProvider).autoRun) {
       await setRunning(true, initialize: true);
@@ -166,13 +208,6 @@ class SetupAction extends _$SetupAction {
   }
 
   bool get wantsRunning => ref.read(isStartProvider) || _resumeOnRestart;
-
-  Future<bool> restoreAfterCoreRestart() {
-    Future<bool> handoff() async => throw const _CoreRestartRequired();
-    return wantsRunning
-        ? _run(true, initialize: true, restartAfterAuthorization: handoff)
-        : _applyProfile(force: true, restartAfterAuthorization: handoff);
-  }
 
   /// The lost session gets no stop; work begun for the old run stops counting.
   void onCoreLost() {
@@ -200,7 +235,6 @@ class SetupAction extends _$SetupAction {
     bool running, {
     required bool initialize,
     bool resume = false,
-    Future<bool> Function()? restartAfterAuthorization,
   }) {
     final request = _RunRequest(
       running: running,
@@ -211,33 +245,22 @@ class SetupAction extends _$SetupAction {
     _latestRunRequest = request;
     _resumeOnRestart = false;
     _setLocalRunning(running);
-    if (request.initialize) {
-      globalState.needInitStatus = false;
+    final task = running ? _start(request) : _stop(request);
+    if (initialize || _initialRun != null && !ref.read(initProvider)) {
+      // The caller reports the outcome. Bootstrap waits for the transition to settle.
+      _initialRun = task.then<void>((_) {}, onError: (Object _) {});
     }
-    return running
-        ? _start(request, restartAfterAuthorization: restartAfterAuthorization)
-        : _stop(request);
+    return task;
   }
 
-  Future<bool> _start(
-    _RunRequest request, {
-    Future<bool> Function()? restartAfterAuthorization,
-  }) async {
+  Future<bool> _start(_RunRequest request) async {
     if (request.initialize) {
       var applied = false;
       try {
-        applied = restartAfterAuthorization == null
-            ? await applyProfile(
-                force: !request.resume,
-                preloadInvoke: () => _startCoreRunning(request),
-              )
-            : await _applyProfile(
-                force: !request.resume,
-                preloadInvoke: () => _startCoreRunning(request),
-                restartAfterAuthorization: restartAfterAuthorization,
-              );
-      } on _CoreRestartRequired {
-        rethrow;
+        applied = await applyProfile(
+          force: !request.resume,
+          preloadInvoke: () => _startCoreRunning(request),
+        );
       } catch (error) {
         if (_isCurrent(request)) {
           dialogs.showBanner(
@@ -487,18 +510,6 @@ class SetupAction extends _$SetupAction {
     bool silence = false,
     bool force = false,
     Future<void> Function()? preloadInvoke,
-  }) => _applyProfile(
-    force: force,
-    silence: silence,
-    preloadInvoke: preloadInvoke,
-    restartAfterAuthorization: _restartCoreAfterAuthorization,
-  );
-
-  Future<bool> _applyProfile({
-    bool silence = false,
-    bool force = false,
-    Future<void> Function()? preloadInvoke,
-    required Future<bool> Function() restartAfterAuthorization,
   }) async {
     final result = await _runSetup(
       force: force,
@@ -506,7 +517,7 @@ class SetupAction extends _$SetupAction {
       preloadInvoke: preloadInvoke,
     );
     if (result == _SetupTaskResult.handoffToCoreRestart) {
-      return restartAfterAuthorization();
+      return _restartCoreAfterAuthorization();
     }
     return result != _SetupTaskResult.failed;
   }
@@ -564,10 +575,21 @@ class SetupAction extends _$SetupAction {
     try {
       return await ref.read(coreActionProvider.notifier).restartCore();
     } catch (_) {
-      ref.read(authorizedTunEnableProvider.notifier).value =
-          TunAuthorizationState.none;
+      _forgetTunAuthorization();
       rethrow;
     }
+  }
+
+  /// A restart asks first, as [_setupConfig] would before handing off to it:
+  /// the apply inside the restart must not hand off to the restart it runs in.
+  /// Returns whether it was granted now.
+  Future<bool> _authorizeTunBeforeRestart() async {
+    return !await requestAdmin(ref.read(patchClashConfigProvider).tun.enable);
+  }
+
+  void _forgetTunAuthorization() {
+    ref.read(authorizedTunEnableProvider.notifier).value =
+        TunAuthorizationState.none;
   }
 
   /// With a base, [BuiltProfile.yaml] is only the overlay the Core applies.
@@ -977,6 +999,7 @@ class SetupAction extends _$SetupAction {
           return;
         }
         globalState.lastConfigMd5 = yamlMd5;
+        ref.invalidate(activeRulesProvider);
         globalState.lastConfigCounts =
             realProfile?.counts ?? configCountsOf(const {});
         _appliedInputs = inputs;

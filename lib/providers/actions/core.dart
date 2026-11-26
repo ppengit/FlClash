@@ -1,9 +1,5 @@
 part of '../action.dart';
 
-class _CoreRestartRequired implements Exception {
-  const _CoreRestartRequired();
-}
-
 @Riverpod(keepAlive: true)
 class CoreAction extends _$CoreAction {
   CoreController get _core => ref.read(coreHandlerProvider);
@@ -124,38 +120,35 @@ class CoreAction extends _$CoreAction {
   }
 
   Future<bool> _runRestartWorker() async {
-    var authorizedRestart = false;
+    final setup = ref.read(setupActionProvider.notifier);
+    var authorizedNow = false;
     try {
-      var restartRequired = true;
+      ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
+      authorizedNow = await setup._authorizeTunBeforeRestart();
+      final result = await restartLifecycle();
+      if (!await _applyLifecycleResult(result, statusFirst: true)) {
+        return false;
+      }
+
       var appliedRevision = 0;
       var applied = true;
-      while (restartRequired || appliedRevision < _requestedRestartRevision) {
-        if (restartRequired) {
-          ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
-          final result = await restartLifecycle();
-          if (!await _applyLifecycleResult(result, statusFirst: true)) {
-            return false;
-          }
-          restartRequired = false;
-        }
+      while (appliedRevision < _requestedRestartRevision) {
         final revision = _requestedRestartRevision;
-        try {
+        if (ref.read(setupActionProvider.notifier).wantsRunning) {
           applied = await ref
               .read(setupActionProvider.notifier)
-              .restoreAfterCoreRestart();
-        } on _CoreRestartRequired {
-          // Setup cannot await the restart operation that is awaiting it.
-          authorizedRestart = true;
-          restartRequired = true;
-          continue;
+              .setRunning(true, initialize: true);
+        } else {
+          applied = await ref
+              .read(setupActionProvider.notifier)
+              .applyProfile(force: true);
         }
         appliedRevision = revision;
       }
       return applied;
     } catch (error) {
-      if (authorizedRestart) {
-        ref.read(authorizedTunEnableProvider.notifier).value =
-            TunAuthorizationState.none;
+      if (authorizedNow) {
+        setup._forgetTunAuthorization();
       }
       _markStopped(error);
       rethrow;
