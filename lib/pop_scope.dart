@@ -4,6 +4,20 @@ import 'package:flutter/widgets.dart';
 
 import 'inherited.dart';
 
+mixin PopProgressRouteMixin<T> on ModalRoute<T> {
+  var _internalPops = 0;
+
+  @override
+  bool didPop(T? result) {
+    final internal = willHandlePopInternally;
+    final popped = super.didPop(result);
+    if (internal && !popped) {
+      _internalPops++;
+    }
+    return popped;
+  }
+}
+
 class PopGuard extends StatelessWidget {
   final Widget child;
 
@@ -19,6 +33,59 @@ class PopGuard extends StatelessWidget {
     this.onPopSuccess,
   });
 
+  static final _popWaiters = Expando<List<Future<void>>>();
+
+  static Future<bool> maybePop(
+    NavigatorState navigator,
+    ModalRoute<Object?> route,
+  ) async {
+    if (!navigator.mounted || !route.isCurrent) {
+      return false;
+    }
+    final internally = route.willHandlePopInternally;
+    final tracked = route is PopProgressRouteMixin<Object?> ? route : null;
+    final internalPops = tracked?._internalPops;
+    final waiters = <Future<void>>[];
+    _popWaiters[route] = waiters;
+    try {
+      if (!await navigator.maybePop()) {
+        return false;
+      }
+      await Future.wait(waiters);
+      return !route.isCurrent ||
+          (tracked != null && tracked._internalPops != internalPops) ||
+          (internally && !route.willHandlePopInternally);
+    } finally {
+      if (identical(_popWaiters[route], waiters)) {
+        _popWaiters[route] = null;
+      }
+    }
+  }
+
+  Future<void> _handlePop(
+    BuildContext context,
+    ModalRoute<Object?>? route, {
+    VoidCallback? onSettled,
+  }) async {
+    try {
+      // BackLayerScope can install its entry without rebuilding this guard.
+      if (route?.willHandlePopInternally == true) {
+        Navigator.of(context).pop();
+        return;
+      }
+      final res = await onPop!(context);
+      if (!context.mounted || !res) {
+        return;
+      }
+      Navigator.of(context).pop();
+    } finally {
+      onSettled?.call();
+    }
+    if (onPopSuccess != null) {
+      await onPopSuccess!();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
@@ -27,27 +94,18 @@ class PopGuard extends StatelessWidget {
       canPop: onPop == null || hasBackLayer,
       onPopInvokedWithResult: onPop == null
           ? null
-          : (didPop, _) async {
+          : (didPop, _) {
               if (didPop) {
                 return;
               }
-              // BackLayerScope adds its entry a frame after this builds, which
-              // rebuilds nothing here on a route with another below it.
-              if (route?.willHandlePopInternally == true) {
-                Navigator.of(context).pop();
-                return;
+              final waiters = route == null ? null : _popWaiters[route];
+              final settled = waiters == null ? null : Completer<void>();
+              if (settled != null) {
+                waiters!.add(settled.future);
               }
-              final res = await onPop!(context);
-              if (!context.mounted) {
-                return;
-              }
-              if (!res) {
-                return;
-              }
-              Navigator.of(context).pop();
-              if (onPopSuccess != null) {
-                await onPopSuccess!();
-              }
+              unawaited(
+                _handlePop(context, route, onSettled: settled?.complete),
+              );
             },
       child: child,
     );

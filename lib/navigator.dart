@@ -7,7 +7,9 @@ import 'package:prism_ui/deferred_push.dart';
 import 'package:prism_ui/drag_back.dart';
 import 'package:prism_ui/keyboard_inset_hold.dart';
 import 'package:prism_ui/liquid_glass.dart';
+import 'package:prism_ui/page_trail.dart';
 import 'package:prism_ui/page_transition.dart';
+import 'package:prism_ui/pop_scope.dart';
 import 'package:prism_ui/route_scope.dart';
 import 'package:prism_ui/sheet_navigator.dart';
 
@@ -25,8 +27,12 @@ class BaseNavigator {
   /// desktop page left open reopens in the mobile form while its opener stays.
   static Future<T?> push<T>(BuildContext context, Widget child) {
     final navigator = Navigator.of(context);
+    final page = PageTrailScope(
+      entries: PageTrailScope.capture(context),
+      child: child,
+    );
     if (context.isMobileView) {
-      return navigator.push<T>(_routeOf(context, child));
+      return navigator.push<T>(_routeOf(context, page));
     }
     final completer = Completer<T?>();
     var popped = false;
@@ -40,7 +46,7 @@ class BaseNavigator {
     }
 
     final route = FadePageRoute<T>(
-      builder: (_) => _DropWatch(onDropped: reopenIfDropped, child: child),
+      builder: (_) => _DropWatch(onDropped: reopenIfDropped, child: page),
     );
     unawaited(
       navigator.push<T>(route).then((value) {
@@ -247,7 +253,10 @@ class _StillUnderSheetState extends State<_StillUnderSheet> {
 }
 
 class FadePageRoute<T> extends PageRoute<T>
-    with DragBackRouteMixin<T>, DeferredPushRouteMixin<T> {
+    with
+        DragBackRouteMixin<T>,
+        DeferredPushRouteMixin<T>,
+        PopProgressRouteMixin<T> {
   final Widget Function(BuildContext context) builder;
 
   FadePageRoute({required this.builder});
@@ -296,7 +305,11 @@ class FadePageRoute<T> extends PageRoute<T>
 }
 
 class CardPageRoute<T> extends PageRoute<T>
-    with DragBackRouteMixin<T>, DeferredPushRouteMixin<T>, CardRouteMixin<T> {
+    with
+        DragBackRouteMixin<T>,
+        DeferredPushRouteMixin<T>,
+        CardRouteMixin<T>,
+        PopProgressRouteMixin<T> {
   final Widget Function(BuildContext context) builder;
 
   CardPageRoute({required this.builder, super.settings});

@@ -12,6 +12,7 @@ import 'package:prism_ui/drag_back.dart';
 import 'package:prism_ui/keyboard_inset_hold.dart';
 import 'package:prism_ui/navigator.dart';
 import 'package:prism_ui/page_transition.dart';
+import 'package:prism_ui/pop_scope.dart';
 import 'package:prism_ui/surface.dart';
 import 'package:prism_ui/theme_data.dart';
 
@@ -217,7 +218,11 @@ final _returnSpring = SpringDescription.withDurationAndBounce(
 // Not a PageRoute: HeroController takes a page route offstage for its first
 // frame, which would hide the tile it zooms out of.
 class _OpenContainerRoute<T> extends ModalRoute<T>
-    with DragBackRouteMixin<T>, DeferredPushRouteMixin<T>, CardRouteMixin<T> {
+    with
+        DragBackRouteMixin<T>,
+        DeferredPushRouteMixin<T>,
+        CardRouteMixin<T>,
+        PopProgressRouteMixin<T> {
   _OpenContainerRoute({
     required RoundedSuperellipseBorder? closedShape,
     required this.closedBuilder,
