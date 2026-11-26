@@ -23,8 +23,16 @@ class SpringCurve extends Curve {
 }
 
 Duration frameIntervalOf(BuildContext context) {
-  final rate = View.maybeOf(context)?.display.refreshRate ?? 0;
-  return rate > 0
+  final view = View.maybeOf(context);
+  final double rate;
+  try {
+    rate = view?.display.refreshRate ?? 0;
+  } on AssertionError {
+    return Duration.zero;
+  } on TypeError {
+    return Duration.zero;
+  }
+  return rate.isFinite && rate > 0
       ? Duration(microseconds: Duration.microsecondsPerSecond ~/ rate)
       : Duration.zero;
 }

@@ -7,6 +7,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/prism_ui.dart';
 import '../helpers/test_app.dart';
 
+class _DisplayLookupView extends TestFlutterView {
+  _DisplayLookupView(TestFlutterView view, {required this.lookup})
+    : super(
+        view: view,
+        platformDispatcher: view.platformDispatcher,
+        display: view.display,
+      );
+
+  final TestDisplay? Function() lookup;
+
+  @override
+  TestDisplay get display => lookup()!;
+}
+
 void main() {
   final navigatorKey = GlobalKey<NavigatorState>();
   // A transition's first tick reads a frame of the 200 ms fade ahead.
@@ -16,6 +30,82 @@ void main() {
     return tester.pumpWidget(
       HostApp(navigatorKey: navigatorKey, home: const SizedBox()),
     );
+  }
+
+  testWidgets('the frame interval follows only valid display refresh rates', (
+    tester,
+  ) async {
+    final display = tester.view.display;
+    addTearDown(display.resetRefreshRate);
+    await pumpHome(tester);
+
+    for (final (rate, microseconds) in [
+      (60.0, 16666),
+      (90.0, 11111),
+      (120.0, 8333),
+      (0.0, 0),
+      (-1.0, 0),
+      (double.nan, 0),
+      (double.infinity, 0),
+    ]) {
+      display.refreshRate = rate;
+      expect(
+        frameIntervalOf(navigatorKey.currentContext!),
+        Duration(microseconds: microseconds),
+      );
+    }
+  });
+
+  for (final assertion in [false, true]) {
+    for (final card in [false, true]) {
+      testWidgets(
+        'a nested ${card ? 'card' : 'fade'} push completes after a display '
+        '${assertion ? 'assertion' : 'null check'} failure',
+        (tester) async {
+          final display = tester.view.display;
+          var hasDisplay = true;
+          final view = _DisplayLookupView(
+            tester.view,
+            lookup: () {
+              if (!hasDisplay && assertion) {
+                throw AssertionError('The display was removed');
+              }
+              return hasDisplay ? display : null;
+            },
+          );
+          await tester.pumpWidget(
+            View(
+              view: view,
+              child: HostApp(
+                home: Navigator(
+                  key: navigatorKey,
+                  pages: const [RootPage<void>(child: SizedBox())],
+                  onDidRemovePage: (_) {},
+                ),
+              ),
+            ),
+            wrapWithView: false,
+          );
+          await tester.pumpAndSettle();
+          hasDisplay = false;
+          final PageRoute<void> route = card
+              ? CardPageRoute<void>(builder: (_) => const Text('page'))
+              : FadePageRoute<void>(builder: (_) => const Text('page'));
+          unawaited(navigatorKey.currentState!.push(route));
+
+          await tester.pump();
+          expect(tester.binding.hasScheduledFrame, isTrue);
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(tester.takeException(), isNull);
+          expect(tester.binding.hasScheduledFrame, isTrue);
+          await tester.pumpAndSettle();
+
+          expect(route.animation!.isCompleted, isTrue);
+          expect(find.text('page').hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   testWidgets('a push keeps its whole transition after a long first frame', (
