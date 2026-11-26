@@ -953,6 +953,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get layout => 'Diseño';
 
   @override
+  String get listAndDetails => 'Lista y detalles';
+
+  @override
   String get tight => 'Ajustado';
 
   @override
@@ -1536,10 +1539,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get ruleScope => 'Ámbito de la regla';
 
   @override
-  String get ruleScopeProfile => 'Este perfil';
+  String get ruleScopeProfile => 'Perfil actual';
 
   @override
-  String get ruleScopeGlobal => 'Todos los perfiles de URL y archivo';
+  String get ruleScopeGlobal => 'Todos los perfiles';
 
   @override
   String get requestRuleSelectProfile =>
@@ -1554,6 +1557,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get ruleTarget => 'Destino de la regla';
+
+  @override
+  String get ruleTargetReject => 'Rechazar conexión';
+
+  @override
+  String get ruleTargetRejectDrop => 'Descartar conexión';
+
+  @override
+  String get ruleTargetPass => 'Continuar con las reglas siguientes';
+
+  @override
+  String get ruleTargetPassRule =>
+      'Omitir el conjunto de reglas actual y continuar';
+
+  @override
+  String get ruleTargetCompatible => 'Conexión compatible';
+
+  @override
+  String get ruleTargetGlobal => 'Grupo de proxy global';
 
   @override
   String get exitDefault => 'Predeterminado';
@@ -2281,6 +2303,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get inputRuleContent => 'Introduce el contenido de la regla';
+
+  @override
+  String ruleContentExample(Object value) {
+    return 'Ejemplo: $value';
+  }
 
   @override
   String get ruleSet => 'Conjunto de reglas';

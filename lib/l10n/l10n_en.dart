@@ -941,6 +941,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layout => 'Layout';
 
   @override
+  String get listAndDetails => 'List and details';
+
+  @override
   String get tight => 'Tight';
 
   @override
@@ -1518,10 +1521,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ruleScope => 'Rule scope';
 
   @override
-  String get ruleScopeProfile => 'This profile';
+  String get ruleScopeProfile => 'Current profile';
 
   @override
-  String get ruleScopeGlobal => 'All URL and file profiles';
+  String get ruleScopeGlobal => 'All profiles';
 
   @override
   String get requestRuleSelectProfile =>
@@ -1536,6 +1539,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ruleTarget => 'Rule target';
+
+  @override
+  String get ruleTargetReject => 'Reject connection';
+
+  @override
+  String get ruleTargetRejectDrop => 'Drop connection';
+
+  @override
+  String get ruleTargetPass => 'Continue matching later rules';
+
+  @override
+  String get ruleTargetPassRule =>
+      'Skip the current ruleset and continue matching';
+
+  @override
+  String get ruleTargetCompatible => 'Compatible direct';
+
+  @override
+  String get ruleTargetGlobal => 'Global proxy group';
 
   @override
   String get exitDefault => 'Default';
@@ -2258,6 +2280,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inputRuleContent => 'Enter the rule content';
+
+  @override
+  String ruleContentExample(Object value) {
+    return 'Example: $value';
+  }
 
   @override
   String get ruleSet => 'Rule set';

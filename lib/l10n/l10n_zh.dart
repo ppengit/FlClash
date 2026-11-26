@@ -909,6 +909,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get layout => '布局';
 
   @override
+  String get listAndDetails => '列表与详情';
+
+  @override
   String get tight => '紧凑';
 
   @override
@@ -1474,7 +1477,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ruleScopeProfile => '当前配置';
 
   @override
-  String get ruleScopeGlobal => '所有 URL 和文件配置';
+  String get ruleScopeGlobal => '所有配置';
 
   @override
   String get requestRuleSelectProfile => '请先选择配置，再从请求记录添加规则。';
@@ -1487,6 +1490,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ruleTarget => '规则目标';
+
+  @override
+  String get ruleTargetReject => '拒绝连接';
+
+  @override
+  String get ruleTargetRejectDrop => '丢弃连接';
+
+  @override
+  String get ruleTargetPass => '继续匹配后续规则';
+
+  @override
+  String get ruleTargetPassRule => '跳过当前规则集继续匹配';
+
+  @override
+  String get ruleTargetCompatible => '兼容直连';
+
+  @override
+  String get ruleTargetGlobal => '全局策略组';
 
   @override
   String get exitDefault => '默认';
@@ -2133,6 +2154,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get inputRuleContent => '输入规则内容';
+
+  @override
+  String ruleContentExample(Object value) {
+    return '示例：$value';
+  }
 
   @override
   String get ruleSet => '规则集';

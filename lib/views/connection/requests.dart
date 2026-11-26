@@ -9,6 +9,7 @@ import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -521,6 +522,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
   List<PopupMenuItem> _buildMenuItems({
     required bool hasActive,
     required bool offersCapture,
+    required bool requestsSplitView,
   }) {
     final appLocalizations = context.appLocalizations;
     final section = offersCapture ? const PopupMenuSection() : null;
@@ -552,6 +554,26 @@ class _RequestsViewState extends ConsumerState<RequestsView>
           ),
         ],
       },
+      if (!ViewScope.isMobileOf(context))
+        PopupMenuItem(
+          glyph: AppGlyphs.dashboard,
+          label: appLocalizations.layout,
+          section: const PopupMenuSection(),
+          subItems: [
+            for (final split in [false, true])
+              PopupMenuItem(
+                label: split
+                    ? appLocalizations.listAndDetails
+                    : appLocalizations.list,
+                checked: requestsSplitView == split,
+                onPressed: () => ref
+                    .read(appSettingProvider.notifier)
+                    .update(
+                      (state) => state.copyWith(requestsSplitView: split),
+                    ),
+              ),
+          ],
+        ),
     ];
   }
 
@@ -559,6 +581,9 @@ class _RequestsViewState extends ConsumerState<RequestsView>
   Widget build(BuildContext context) {
     final hasActive = ref.watch(
       requestsProvider.select((log) => log.activeCount > 0),
+    );
+    final requestsSplitView = ref.watch(
+      appSettingProvider.select((state) => state.requestsSplitView),
     );
     final showsHttp = ref.watch(patchClashConfigProvider.select(_showsHttp));
     final offersCapture = ref.watch(
@@ -578,7 +603,8 @@ class _RequestsViewState extends ConsumerState<RequestsView>
       child: TrackerClock(
         child: WidthBuilder(
           builder: (context, width) {
-            final split = !mobile && width >= _splitMinWidth;
+            final split =
+                requestsSplitView && !mobile && width >= _splitMinWidth;
             if (split != _split) {
               _split = split;
               WidgetsBinding.instance.addPostFrameCallback(
@@ -591,6 +617,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
               hasActive: hasActive,
               showsHttp: showsHttp,
               offersCapture: offersCapture,
+              requestsSplitView: requestsSplitView,
             );
           },
         ),
@@ -645,8 +672,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     };
   }
 
-  /// The selection moves between the sheet and the pane as the page's width
-  /// crosses where the pane fits.
+  /// The selection moves between the sheet and the pane as the layout changes.
   void _settleDetail() {
     if (!mounted) {
       return;
@@ -667,6 +693,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     required bool hasActive,
     required bool showsHttp,
     required bool offersCapture,
+    required bool requestsSplitView,
   }) {
     final mobile = ViewScope.isMobileOf(context);
     final list = mobile
@@ -680,6 +707,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
       menuItems: _buildMenuItems(
         hasActive: hasActive,
         offersCapture: offersCapture,
+        requestsSplitView: requestsSplitView,
       ),
       body: split ? _buildSplit(header, list) : list,
     );
@@ -745,7 +773,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
             padding: EdgeInsets.symmetric(
               horizontal: context.listInsets.margin,
             ),
-            child: ConnectedButtonBar<RequestsSegment>(
+            child: SegmentedControl<RequestsSegment>(
               segments: [
                 (
                   RequestsSegment.connections,

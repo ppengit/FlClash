@@ -9,6 +9,7 @@ import 'package:prism_ui/icons/icons.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 part 'scaffold_actions.dart';
+part 'scaffold_breadcrumbs.dart';
 part 'scaffold_search.dart';
 
 class AppBarSearchState {
@@ -142,6 +143,8 @@ class ScaffoldState extends State<Scaffold>
   final _searchLeadingKey = GlobalKey();
   final _searchFieldKey = GlobalKey();
   final _barKey = GlobalKey();
+  late final _breadcrumbTitle = ValueNotifier(widget.title ?? '');
+  PageTrailEntry? _breadcrumbEntry;
   var _searchFillsBar = true;
   var _searchDocked = false;
   var _sorting = false;
@@ -283,6 +286,13 @@ class ScaffoldState extends State<Scaffold>
   @override
   void didUpdateWidget(Scaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_breadcrumbTitle.value != (widget.title ?? '')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _breadcrumbTitle.value = widget.title ?? '';
+        }
+      });
+    }
     if (oldWidget.searchState != widget.searchState) {
       final query = _appBarState.value?.query;
       _appBarState.value = widget.searchState?.withQuery(query);
@@ -345,6 +355,11 @@ class ScaffoldState extends State<Scaffold>
     _searchOrigin.dispose();
     _searchCovered.dispose();
     _loadingNotifier.dispose();
+    final entry = _breadcrumbEntry;
+    if (entry != null) {
+      PageTrailScope.unregister(entry);
+    }
+    _breadcrumbTitle.dispose();
     super.dispose();
   }
 
@@ -562,22 +577,33 @@ class ScaffoldState extends State<Scaffold>
     );
   }
 
-  Widget _buildTitle({required bool compact}) {
+  Widget _buildTitle({
+    required bool compact,
+    required List<PageTrailEntry> ancestors,
+  }) {
+    final title =
+        widget.titleWidget ??
+        (widget.titleMenuItems.isEmpty
+            ? Text(widget.title!)
+            : PopupAnchor(
+                placement: PopupPlacement.overAnchorStart,
+                bare: true,
+                targetBuilder: (open) => _TitleMenuButton(
+                  title: widget.title!,
+                  compact: compact,
+                  onPressed: open,
+                ),
+                popupBuilder: (_) => PopupMenu(items: widget.titleMenuItems),
+              ));
+    final current = _breadcrumbEntry;
     return BarItemPresence.title(
-      child:
-          widget.titleWidget ??
-          (widget.titleMenuItems.isEmpty
-              ? Text(widget.title!)
-              : PopupAnchor(
-                  placement: PopupPlacement.overAnchorStart,
-                  bare: true,
-                  targetBuilder: (open) => _TitleMenuButton(
-                    title: widget.title!,
-                    compact: compact,
-                    onPressed: open,
-                  ),
-                  popupBuilder: (_) => PopupMenu(items: widget.titleMenuItems),
-                )),
+      child: ancestors.isEmpty || current == null
+          ? title
+          : _BreadcrumbTitle(
+              ancestors: ancestors,
+              current: current,
+              child: title,
+            ),
     );
   }
 
@@ -767,7 +793,11 @@ class ScaffoldState extends State<Scaffold>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(VoidCallback? backAction, _SheetForm form) {
+  PreferredSizeWidget _buildAppBar(
+    VoidCallback? backAction,
+    _SheetForm form,
+    List<PageTrailEntry> ancestors,
+  ) {
     final isCompact = form.isCompact;
     final isMobileView = ViewScope.isMobileOf(context);
     final pushed =
@@ -830,12 +860,15 @@ class ScaffoldState extends State<Scaffold>
               ? null
               : underField(
                   leading == null || isCompact
-                      ? _buildTitle(compact: compactTitle)
+                      ? _buildTitle(compact: compactTitle, ancestors: ancestors)
                       : Padding(
                           padding: EdgeInsetsDirectional.only(
                             end: titleEndInset,
                           ),
-                          child: _buildTitle(compact: compactTitle),
+                          child: _buildTitle(
+                            compact: compactTitle,
+                            ancestors: ancestors,
+                          ),
                         ),
                   _titleUnderSearch,
                 ),
@@ -880,8 +913,31 @@ class ScaffoldState extends State<Scaffold>
     final keywords = widget.keywords;
     final header = widget.header;
     final docked = form.dockedSearch;
-    return PrismScaffold(
-      bar: _buildAppBar(backAction, form),
+    final route = form.pop == null ? routeOf(context) : null;
+    final previous = _breadcrumbEntry;
+    if (previous != null &&
+        (!identical(previous.route, route) || widget.title == null)) {
+      PageTrailScope.unregister(previous);
+      _breadcrumbEntry = null;
+    }
+    if (route != null && widget.title != null) {
+      final entry = _breadcrumbEntry ??= PageTrailEntry(
+        title: _breadcrumbTitle,
+        route: route,
+        context: context,
+      );
+      PageTrailScope.register(entry);
+    }
+    final ancestors = [
+      for (final entry in PageTrailScope.of(context))
+        if (entry.context.mounted &&
+            !identical(entry.route, route) &&
+            entry.route.isActive &&
+            identical(entry.route.navigator, route?.navigator))
+          entry,
+    ];
+    final scaffold = PrismScaffold(
+      bar: _buildAppBar(backAction, form, ancestors),
       body: SortModeScope(sorting: _sorting, child: widget.body),
       headerListenable: keywords,
       headerBuilder: header != null
@@ -902,6 +958,10 @@ class ScaffoldState extends State<Scaffold>
           : null,
       backgroundColor: widget.backgroundColor,
       resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
+    );
+    return PageTrailScope(
+      entries: [...ancestors, ?_breadcrumbEntry],
+      child: scaffold,
     );
   }
 }

@@ -913,6 +913,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get layout => 'レイアウト';
 
   @override
+  String get listAndDetails => 'リストと詳細';
+
+  @override
   String get tight => 'コンパクト';
 
   @override
@@ -1479,10 +1482,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get ruleScope => 'ルールの適用範囲';
 
   @override
-  String get ruleScopeProfile => 'このプロファイル';
+  String get ruleScopeProfile => '現在のプロファイル';
 
   @override
-  String get ruleScopeGlobal => 'すべての URL・ファイルプロファイル';
+  String get ruleScopeGlobal => 'すべてのプロファイル';
 
   @override
   String get requestRuleSelectProfile => 'リクエストからルールを追加する前に、プロファイルを選択してください。';
@@ -1496,6 +1499,24 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get ruleTarget => 'ルールターゲット';
+
+  @override
+  String get ruleTargetReject => '接続を拒否';
+
+  @override
+  String get ruleTargetRejectDrop => '接続を破棄';
+
+  @override
+  String get ruleTargetPass => '後続のルールで照合を続ける';
+
+  @override
+  String get ruleTargetPassRule => '現在のルールセットをスキップして照合を続ける';
+
+  @override
+  String get ruleTargetCompatible => '互換性のある直接接続';
+
+  @override
+  String get ruleTargetGlobal => 'グローバルプロキシグループ';
 
   @override
   String get exitDefault => 'デフォルト';
@@ -2155,6 +2176,11 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get inputRuleContent => 'ルールの内容を入力してください';
+
+  @override
+  String ruleContentExample(Object value) {
+    return '例：$value';
+  }
 
   @override
   String get ruleSet => 'ルールセット';

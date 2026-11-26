@@ -146,10 +146,26 @@ void main() {
       expect(restored.tabAnimation, TabAnimation.fade);
       expect(restored.autoCheckUpdate, true);
       expect(restored.sidebarExpanded, true);
+      expect(restored.requestsSplitView, true);
       expect(restored.minimizeOnExit, true);
       expect(restored.restoreStrategy, RestoreStrategy.compatible);
       expect(restored.userAgents, defaultUserAgents);
       expect(restored.filters, defaultFilters);
+    });
+
+    test(
+      'requests keep the adaptive split layout when no preference was saved',
+      () {
+        expect(AppSettingProps.fromJson({}).requestsSplitView, isTrue);
+      },
+    );
+
+    test('both requests layouts survive JSON round-trip', () {
+      for (final split in [false, true]) {
+        final props = AppSettingProps(requestsSplitView: split);
+        final restored = roundTrip(props.toJson, AppSettingProps.fromJson);
+        expect(restored.requestsSplitView, split);
+      }
     });
 
     test('a saved outboundModeV2 card folds into outboundMode', () {

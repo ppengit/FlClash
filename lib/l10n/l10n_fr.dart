@@ -952,6 +952,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get layout => 'Disposition';
 
   @override
+  String get listAndDetails => 'Liste et détails';
+
+  @override
   String get tight => 'Serrée';
 
   @override
@@ -1536,10 +1539,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get ruleScope => 'Portée de la règle';
 
   @override
-  String get ruleScopeProfile => 'Ce profil';
+  String get ruleScopeProfile => 'Profil actuel';
 
   @override
-  String get ruleScopeGlobal => 'Tous les profils URL et fichier';
+  String get ruleScopeGlobal => 'Tous les profils';
 
   @override
   String get requestRuleSelectProfile =>
@@ -1554,6 +1557,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get ruleTarget => 'Cible de la règle';
+
+  @override
+  String get ruleTargetReject => 'Refuser la connexion';
+
+  @override
+  String get ruleTargetRejectDrop => 'Ignorer la connexion';
+
+  @override
+  String get ruleTargetPass => 'Continuer avec les règles suivantes';
+
+  @override
+  String get ruleTargetPassRule =>
+      'Ignorer l’ensemble de règles actuel et continuer';
+
+  @override
+  String get ruleTargetCompatible => 'Connexion compatible';
+
+  @override
+  String get ruleTargetGlobal => 'Groupe de proxy global';
 
   @override
   String get exitDefault => 'Par défaut';
@@ -2280,6 +2302,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get inputRuleContent => 'Saisissez le contenu de la règle';
+
+  @override
+  String ruleContentExample(Object value) {
+    return 'Exemple : $value';
+  }
 
   @override
   String get ruleSet => 'Jeu de règles';

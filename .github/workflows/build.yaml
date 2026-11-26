@@ -815,10 +815,10 @@ jobs:
             echo "Based on upstream v${version%%-custom.*}. Windows amd64 packages built from ${{ github.sha }} after the full repository check suite."
             echo
             echo '<!-- flclash:changelog:begin -->'
-            echo '- Keep navigation working after display changes and converge overlapping profile changes and TUN authorization.'
-            echo '- Explain profile-specific and global rules, script scope, rule-set activation, and when changes apply.'
-            echo '- Add rules from request records with domain, IP and process prefills, choosing this profile or all URL/file profiles.'
-            echo '- Add an independent persistent Hide error proxies option; keep unmeasured proxies visible and reuse display settings across profiles.'
+            echo '- Show the complete page breadcrumb path and return directly to any ancestor while respecting page guards.'
+            echo '- Choose and remember List or List and details on Requests, and give Connections and DNS tabs consistent pill corners.'
+            echo '- Explain rule types and outbound strategies in the rule form, with input examples that follow the selected type.'
+            echo '- Use Current profile and All profiles scope labels while preserving the documented custom-profile exception.'
             echo '<!-- flclash:changelog:end -->'
             echo
             echo '## Downloads'

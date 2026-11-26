@@ -941,6 +941,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get layout => 'Макет';
 
   @override
+  String get listAndDetails => 'Список и сведения';
+
+  @override
   String get tight => 'Плотный';
 
   @override
@@ -1518,10 +1521,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get ruleScope => 'Область действия правила';
 
   @override
-  String get ruleScopeProfile => 'Этот профиль';
+  String get ruleScopeProfile => 'Текущий профиль';
 
   @override
-  String get ruleScopeGlobal => 'Все профили из URL и файлов';
+  String get ruleScopeGlobal => 'Все профили';
 
   @override
   String get requestRuleSelectProfile =>
@@ -1536,6 +1539,26 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get ruleTarget => 'Цель правила';
+
+  @override
+  String get ruleTargetReject => 'Отклонить соединение';
+
+  @override
+  String get ruleTargetRejectDrop => 'Сбросить соединение';
+
+  @override
+  String get ruleTargetPass =>
+      'Продолжить сопоставление со следующими правилами';
+
+  @override
+  String get ruleTargetPassRule =>
+      'Пропустить текущий набор правил и продолжить сопоставление';
+
+  @override
+  String get ruleTargetCompatible => 'Совместимое прямое соединение';
+
+  @override
+  String get ruleTargetGlobal => 'Глобальная группа прокси';
 
   @override
   String get exitDefault => 'По умолчанию';
@@ -2256,6 +2279,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get inputRuleContent => 'Введите содержимое правила';
+
+  @override
+  String ruleContentExample(Object value) {
+    return 'Пример: $value';
+  }
 
   @override
   String get ruleSet => 'Набор правил';

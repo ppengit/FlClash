@@ -1860,6 +1860,12 @@ abstract class AppLocalizations {
   /// **'Layout'**
   String get layout;
 
+  /// No description provided for @listAndDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'List and details'**
+  String get listAndDetails;
+
   /// No description provided for @tight.
   ///
   /// In en, this message translates to:
@@ -2949,13 +2955,13 @@ abstract class AppLocalizations {
   /// No description provided for @ruleScopeProfile.
   ///
   /// In en, this message translates to:
-  /// **'This profile'**
+  /// **'Current profile'**
   String get ruleScopeProfile;
 
   /// No description provided for @ruleScopeGlobal.
   ///
   /// In en, this message translates to:
-  /// **'All URL and file profiles'**
+  /// **'All profiles'**
   String get ruleScopeGlobal;
 
   /// No description provided for @requestRuleSelectProfile.
@@ -2981,6 +2987,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rule target'**
   String get ruleTarget;
+
+  /// No description provided for @ruleTargetReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject connection'**
+  String get ruleTargetReject;
+
+  /// No description provided for @ruleTargetRejectDrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop connection'**
+  String get ruleTargetRejectDrop;
+
+  /// No description provided for @ruleTargetPass.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue matching later rules'**
+  String get ruleTargetPass;
+
+  /// No description provided for @ruleTargetPassRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip the current ruleset and continue matching'**
+  String get ruleTargetPassRule;
+
+  /// No description provided for @ruleTargetCompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'Compatible direct'**
+  String get ruleTargetCompatible;
+
+  /// No description provided for @ruleTargetGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Global proxy group'**
+  String get ruleTargetGlobal;
 
   /// No description provided for @exitDefault.
   ///
@@ -4145,6 +4187,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter the rule content'**
   String get inputRuleContent;
+
+  /// No description provided for @ruleContentExample.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: {value}'**
+  String ruleContentExample(Object value);
 
   /// No description provided for @ruleSet.
   ///

@@ -335,6 +335,7 @@ class ListItem<T> extends StatelessWidget {
             },
           );
         }
+        final trail = PageTrailScope.capture(context);
         return OpenContainer<dynamic>(
           clipBehavior: Clip.none,
           closedShape: position == null
@@ -350,9 +351,10 @@ class ListItem<T> extends StatelessWidget {
             );
           },
           onClosed: onChanged,
-          openBuilder: (context, action) {
-            return openDelegate.buildPage(context);
-          },
+          openBuilder: (context, action) => PageTrailScope(
+            entries: trail,
+            child: openDelegate.buildPage(context),
+          ),
         );
       case final _OptionsAction options:
         final optionsDelegate = options as _OptionsAction<T>;

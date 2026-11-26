@@ -913,6 +913,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get layout => '레이아웃';
 
   @override
+  String get listAndDetails => '목록 및 상세 정보';
+
+  @override
   String get tight => '좁게';
 
   @override
@@ -1479,10 +1482,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get ruleScope => '규칙 적용 범위';
 
   @override
-  String get ruleScopeProfile => '이 프로필';
+  String get ruleScopeProfile => '현재 프로필';
 
   @override
-  String get ruleScopeGlobal => '모든 URL 및 파일 프로필';
+  String get ruleScopeGlobal => '모든 프로필';
 
   @override
   String get requestRuleSelectProfile => '요청에서 규칙을 추가하기 전에 프로필을 선택하세요.';
@@ -1496,6 +1499,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get ruleTarget => '규칙 대상';
+
+  @override
+  String get ruleTargetReject => '연결 거부';
+
+  @override
+  String get ruleTargetRejectDrop => '연결 삭제';
+
+  @override
+  String get ruleTargetPass => '이후 규칙 계속 일치';
+
+  @override
+  String get ruleTargetPassRule => '현재 규칙 집합을 건너뛰고 계속 일치';
+
+  @override
+  String get ruleTargetCompatible => '호환 직접 연결';
+
+  @override
+  String get ruleTargetGlobal => '전역 프록시 그룹';
 
   @override
   String get exitDefault => '기본값';
@@ -2202,6 +2223,11 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get inputRuleContent => '규칙 내용을 입력하세요';
+
+  @override
+  String ruleContentExample(Object value) {
+    return '예: $value';
+  }
 
   @override
   String get ruleSet => '규칙 세트';

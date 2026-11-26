@@ -27,6 +27,7 @@ void main() {
       expect(value.autoLaunch, false);
       expect(value.closeConnections, true);
       expect(value.tabAnimation, TabAnimation.fade);
+      expect(value.requestsSplitView, isTrue);
     });
 
     test('can update state', () {
@@ -36,6 +37,47 @@ void main() {
       final value = container.read(appSettingProvider);
       expect(value.autoLaunch, true);
     });
+
+    test(
+      'requests layout persists globally across profile switches and reloads',
+      () async {
+        await mockPreferences();
+        container.listen(configProvider, (_, _) {});
+        for (final split in [false, true]) {
+          container
+              .read(appSettingProvider.notifier)
+              .update((state) => state.copyWith(requestsSplitView: split));
+          for (final profileId in [11, 22, null, 11]) {
+            container.read(currentProfileIdProvider.notifier).value = profileId;
+            expect(container.read(appSettingProvider).requestsSplitView, split);
+            expect(
+              container.read(configProvider).appSettingProps.requestsSplitView,
+              split,
+            );
+          }
+
+          expect(
+            await preferences.saveConfig(container.read(configProvider)),
+            isTrue,
+          );
+          final restored = await preferences.getConfig();
+          expect(restored?.appSettingProps.requestsSplitView, split);
+          final reloaded = ProviderContainer(
+            overrides: buildConfigOverrides(restored!),
+          );
+          addTearDown(reloaded.dispose);
+          reloaded.listen(configProvider, (_, _) {});
+          for (final profileId in [22, null, 11]) {
+            reloaded.read(currentProfileIdProvider.notifier).value = profileId;
+            expect(reloaded.read(appSettingProvider).requestsSplitView, split);
+            expect(
+              reloaded.read(configProvider).appSettingProps.requestsSplitView,
+              split,
+            );
+          }
+        }
+      },
+    );
   });
 
   group('WindowSetting provider', () {

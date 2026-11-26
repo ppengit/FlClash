@@ -12,6 +12,8 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/connection/requests.dart';
+import 'package:fl_clash/views/connection/requests_detail_pane.dart'
+    show RequestsDetailPane;
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -439,7 +441,7 @@ void main() {
     );
     final list = tester.getRect(find.byType(ScrollToEndBox));
     final segment = tester.getRect(
-      find.byType(ConnectedButtonBar<RequestsSegment>),
+      find.byType(SegmentedControl<RequestsSegment>),
     );
     expect(
       tester.getRect(find.byTooltip('Search')).left,
@@ -488,6 +490,185 @@ void main() {
     expect(selectedRows(tester), isEmpty);
     expect(empty, findsOneWidget);
 
+    await teardownView(tester);
+  });
+
+  Finder inMenu(Finder finder) =>
+      find.descendant(of: find.byType(PopupMenu), matching: finder);
+
+  final more = find.descendant(
+    of: find.byType(AppBar),
+    matching: find.byGlyph(AppGlyphs.more),
+  );
+
+  Future<void> openSubMenu(WidgetTester tester, String label) async {
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(inMenu(find.text(label)));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'request segments keep the same pill shape when selection changes',
+    (tester) async {
+      seedRequests([_tracker(id: 'a', host: 'alpha.test')]);
+      final control = find.byType(SegmentedControl<RequestsSegment>);
+
+      for (final size in [_listSize, _tableSize]) {
+        await pumpRequests(tester, size: size);
+        for (final segment in [
+          RequestsSegment.connections,
+          RequestsSegment.dns,
+          RequestsSegment.connections,
+        ]) {
+          await tester.tap(
+            find.descendant(
+              of: control,
+              matching: find.text(
+                segment == RequestsSegment.dns ? 'DNS' : 'Connections',
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<SegmentedControl<RequestsSegment>>(control).value,
+            segment,
+          );
+          final buttons = tester.widgetList<PressSurface>(
+            find.descendant(of: control, matching: find.byType(PressSurface)),
+          );
+          expect(buttons, hasLength(2));
+          expect(
+            buttons.map((button) => button.shape),
+            everyElement(AppShape.full),
+          );
+          expect(buttons.where((button) => button.selected), hasLength(1));
+        }
+        expect(targetOf('alpha.test'), findsOneWidget);
+        await teardownView(tester);
+      }
+    },
+  );
+
+  PopupMenuItem layoutMenu(WidgetTester tester) => tester
+      .widget<Scaffold>(
+        find
+            .ancestor(
+              of: find.byType(SegmentedControl<RequestsSegment>),
+              matching: find.byType(Scaffold),
+            )
+            .first,
+      )
+      .menuItems
+      .singleWhere((item) => item.label == 'Layout');
+
+  testWidgets('the wide layout menu moves the selected connection between '
+      'the pane and sheet without clearing it', (tester) async {
+    seedRequests([_tracker(id: 'a', host: 'alpha.test')]);
+    await pumpRequests(tester);
+    await tester.tap(targetOf('alpha.test'));
+    await tester.pumpAndSettle();
+    final splitAction = layoutMenu(tester).subItems.last.onPressed!;
+    expect(layoutMenu(tester).subItems.map((item) => item.checked), [
+      false,
+      true,
+    ]);
+
+    await openSubMenu(tester, 'Layout');
+    await tester.tap(inMenu(find.text('List')));
+    await tester.pumpAndSettle();
+    expect(container.read(appSettingProvider).requestsSplitView, isFalse);
+    expect(find.byType(RequestsDetailPane), findsNothing);
+    expect(find.byType(TrackerInfoDetailSheet), findsOneWidget);
+    expect(
+      tester
+          .widget<TrackerInfoHeader>(find.byType(TrackerInfoHeader))
+          .trackerInfo
+          .id,
+      'a',
+    );
+    expect(selectedRows(tester), ['a']);
+    expect(layoutMenu(tester).subItems.map((item) => item.checked), [
+      true,
+      false,
+    ]);
+
+    splitAction();
+    await tester.pumpAndSettle();
+    expect(container.read(appSettingProvider).requestsSplitView, isTrue);
+    expect(find.byType(RequestsDetailPane), findsOneWidget);
+    expect(find.byType(TrackerInfoDetailSheet), findsNothing);
+    expect(
+      tester
+          .widget<TrackerInfoHeader>(find.byType(TrackerInfoHeader))
+          .trackerInfo
+          .id,
+      'a',
+    );
+    expect(selectedRows(tester), ['a']);
+    expect(layoutMenu(tester).subItems.map((item) => item.checked), [
+      false,
+      true,
+    ]);
+    expect(tester.takeException(), isNull);
+    await teardownView(tester);
+  });
+
+  testWidgets(
+    'the layout menu choice survives leaving and reopening requests',
+    (tester) async {
+      container.listen(appSettingProvider, (_, _) {});
+      await pumpRequests(tester);
+      await openSubMenu(tester, 'Layout');
+      await tester.tap(inMenu(find.text('List')));
+      await tester.pumpAndSettle();
+      expect(find.byType(RequestsDetailPane), findsNothing);
+      await teardownView(tester);
+
+      await pumpRequests(tester);
+      expect(find.byType(RequestsDetailPane), findsNothing);
+      expect(layoutMenu(tester).subItems.map((item) => item.checked), [
+        true,
+        false,
+      ]);
+      await openSubMenu(tester, 'Layout');
+      await tester.tap(inMenu(find.text('List and details')));
+      await tester.pumpAndSettle();
+      expect(find.byType(RequestsDetailPane), findsOneWidget);
+      await teardownView(tester);
+
+      await pumpRequests(tester);
+      expect(find.byType(RequestsDetailPane), findsOneWidget);
+      expect(layoutMenu(tester).subItems.map((item) => item.checked), [
+        false,
+        true,
+      ]);
+      await teardownView(tester);
+    },
+  );
+
+  testWidgets('list and details still requires the minimum pane width', (
+    tester,
+  ) async {
+    final minWidth = 392 + RequestsDetailPane.minWidth;
+    await pumpRequests(tester, size: Size(minWidth - 1, 1000));
+    expect(find.byType(RequestsDetailPane), findsNothing);
+    for (final label in ['List', 'List and details']) {
+      await openSubMenu(tester, 'Layout');
+      await tester.tap(inMenu(find.text(label)));
+      await tester.pumpAndSettle();
+      expect(find.byType(RequestsDetailPane), findsNothing);
+    }
+    expect(container.read(appSettingProvider).requestsSplitView, isTrue);
+
+    tester.view.physicalSize = Size(minWidth, 1000);
+    await tester.pumpAndSettle();
+    expect(find.byType(RequestsDetailPane), findsOneWidget);
+    tester.view.physicalSize = Size(minWidth - 1, 1000);
+    await tester.pumpAndSettle();
+    expect(find.byType(RequestsDetailPane), findsNothing);
+    expect(container.read(appSettingProvider).requestsSplitView, isTrue);
+    expect(tester.takeException(), isNull);
     await teardownView(tester);
   });
 
@@ -751,7 +932,10 @@ void main() {
       expect(inForm(find.text('Edit rule')), findsNothing);
       expect(inForm(find.text('rule.test')), findsOneWidget);
       expect(inForm(find.text('Rule scope')), findsOneWidget);
-      expect(inForm(find.text('This profile')), findsOneWidget);
+      expect(
+        inForm(find.text(currentAppLocalizations.ruleScopeProfile)),
+        findsOneWidget,
+      );
       await saveRule(tester);
 
       final saved = writes.profiles[first.id]!.single;
@@ -769,7 +953,7 @@ void main() {
       await openRule(tester);
       await tester.tap(inForm(find.text('Rule scope')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('All URL and file profiles').last);
+      await tester.tap(find.text(currentAppLocalizations.ruleScopeGlobal).last);
       await tester.pumpAndSettle();
       await saveRule(tester);
 
@@ -786,7 +970,10 @@ void main() {
       await openRule(tester);
       await tester.tap(inForm(find.text('Rule scope')));
       await tester.pumpAndSettle();
-      expect(find.text('All URL and file profiles'), findsOneWidget);
+      expect(
+        find.text(currentAppLocalizations.ruleScopeGlobal),
+        findsOneWidget,
+      );
       await dismissMenu(tester);
       await saveRule(tester);
 
@@ -816,7 +1003,9 @@ void main() {
         if (global) {
           await tester.tap(inForm(find.text('Rule scope')));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('All URL and file profiles').last);
+          await tester.tap(
+            find.text(currentAppLocalizations.ruleScopeGlobal).last,
+          );
           await tester.pumpAndSettle();
         }
         await container.read(profilesProvider.notifier).del(first.id);
@@ -839,8 +1028,14 @@ void main() {
           .put(first.copyWith(type: ProfileType.custom));
       await openRule(tester);
 
-      expect(inForm(find.text('This profile')), findsOneWidget);
-      expect(inForm(find.text('All URL and file profiles')), findsNothing);
+      expect(
+        inForm(find.text(currentAppLocalizations.ruleScopeProfile)),
+        findsOneWidget,
+      );
+      expect(
+        inForm(find.text(currentAppLocalizations.ruleScopeGlobal)),
+        findsNothing,
+      );
       await tester.tap(
         inForm(find.text(currentAppLocalizations.splitStrategy)),
       );
@@ -1237,21 +1432,6 @@ void main() {
 
     await teardownView(tester);
   });
-
-  Finder inMenu(Finder finder) =>
-      find.descendant(of: find.byType(PopupMenu), matching: finder);
-
-  final more = find.descendant(
-    of: find.byType(AppBar),
-    matching: find.byGlyph(AppGlyphs.more),
-  );
-
-  Future<void> openSubMenu(WidgetTester tester, String label) async {
-    await tester.tap(more);
-    await tester.pumpAndSettle();
-    await tester.tap(inMenu(find.text(label)));
-    await tester.pumpAndSettle();
-  }
 
   List<String> mockClipboard(WidgetTester tester) {
     final copied = <String>[];
@@ -2105,7 +2285,7 @@ void main() {
         for (final item in tester.widgetList<PopupMenu>(find.byType(PopupMenu)))
           for (final entry in item.items) (entry.label, entry.danger),
       ],
-      [('Close all active connections', true)],
+      [('Close all active connections', true), ('Layout', false)],
     );
 
     await tester.tap(inMenu(find.text('Close all active connections')));
@@ -2137,7 +2317,7 @@ void main() {
     final close = tester
         .widgetList<PopupMenu>(find.byType(PopupMenu))
         .expand((menu) => menu.items)
-        .single;
+        .singleWhere((item) => item.label == 'Close all active connections');
     expect(close.label, 'Close all active connections');
     expect(close.onPressed, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -2152,7 +2332,7 @@ void main() {
         for (final item in tester.widgetList<PopupMenu>(find.byType(PopupMenu)))
           for (final entry in item.items) entry.label,
       ],
-      ['Clear DNS cache'],
+      ['Clear DNS cache', 'Layout'],
     );
 
     await teardownView(tester);
