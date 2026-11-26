@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show FlutterView;
 
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
@@ -23,18 +24,20 @@ class SpringCurve extends Curve {
 }
 
 Duration frameIntervalOf(BuildContext context) {
-  final view = View.maybeOf(context);
-  final double rate;
-  try {
-    rate = view?.display.refreshRate ?? 0;
-  } on AssertionError {
-    return Duration.zero;
-  } on TypeError {
-    return Duration.zero;
-  }
+  final rate = _refreshRateOf(View.maybeOf(context));
   return rate.isFinite && rate > 0
       ? Duration(microseconds: Duration.microsecondsPerSecond ~/ rate)
       : Duration.zero;
+}
+
+// FlutterView.display throws while the engine has no display under the view's
+// id, as after a monitor sleeps, is unplugged or is switched.
+double _refreshRateOf(FlutterView? view) {
+  try {
+    return view?.display.refreshRate ?? 0;
+  } on Error {
+    return 0;
+  }
 }
 
 /// Ends [simulation] at [end], where a controller would hold an overshoot.
