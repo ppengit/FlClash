@@ -815,10 +815,12 @@ jobs:
             echo "Based on upstream v${version%%-custom.*}. Windows amd64 packages built from ${{ github.sha }} after the full repository check suite."
             echo
             echo '<!-- flclash:changelog:begin -->'
-            echo '- Show the complete page breadcrumb path and return directly to any ancestor while respecting page guards.'
-            echo '- Choose and remember List or List and details on Requests, and give Connections and DNS tabs consistent pill corners.'
-            echo '- Explain rule types and outbound strategies in the rule form, with input examples that follow the selected type.'
-            echo '- Use Current profile and All profiles scope labels while preserving the documented custom-profile exception.'
+            echo '- 请求页恢复快捷筛选标签（如 TCP、规则类型等），点按即可筛选，再点取消。'
+            echo '- 所有切换类选项统一为圆角胶囊，未选中项不再出现内外圆角大小不一致。'
+            echo '- 页面顶部显示完整面包屑路径，可点击返回任意上级页面，并保留离开确认。'
+            echo '- 请求页可在“列表 / 列表与详情”间切换，选择在重启和切换配置后保留。'
+            echo '- 规则表单显示规则类型与分流策略的中文说明，并随类型显示填写示例。'
+            echo '- 规则作用范围使用“当前配置 / 所有配置”，自定义配置仍只使用自身规则。'
             echo '<!-- flclash:changelog:end -->'
             echo
             echo '## Downloads'

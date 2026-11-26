@@ -315,7 +315,7 @@ class _ConnectionsTableCardState extends ConsumerState<ConnectionsTableCard>
       first: feed == DashboardFeed.values.first,
       last: feed == DashboardFeed.values.last,
       outer: headerHeight / 2,
-      inner: 8,
+      inner: headerHeight / 2,
       background: DashboardColors.of(context).tone,
       semanticLabel: feed.label,
       onTap: () => _select(feed),

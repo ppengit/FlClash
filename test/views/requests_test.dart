@@ -862,6 +862,38 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('quick filter chips offer facet values and toggle the list', (
+    tester,
+  ) async {
+    seedRequests([
+      _tracker(id: 'tcp', host: 'tcp.test'),
+      _tracker(id: 'udp', host: 'udp.test', network: 'udp'),
+    ]);
+    await pumpRequests(tester);
+
+    expect(find.widgetWithText(Chip, 'TCP'), findsOneWidget);
+    expect(find.widgetWithText(Chip, 'UDP'), findsOneWidget);
+    expect(targetOf('udp.test'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(Chip, 'TCP'));
+    await tester.pumpAndSettle();
+    expect(targetOf('udp.test'), findsNothing);
+    expect(targetOf('tcp.test'), findsOneWidget);
+    expect(
+      tester.widget<Chip>(find.widgetWithText(Chip, 'TCP')).selected,
+      isTrue,
+    );
+
+    await tester.tap(find.widgetWithText(Chip, 'TCP'));
+    await tester.pumpAndSettle();
+    expect(targetOf('udp.test'), findsOneWidget);
+    expect(
+      tester.widget<Chip>(find.widgetWithText(Chip, 'TCP')).selected,
+      isFalse,
+    );
+    await teardownView(tester);
+  });
+
   group('adding rules from requests', () {
     const first = Profile(
       id: 1,

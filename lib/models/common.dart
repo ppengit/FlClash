@@ -332,6 +332,8 @@ final trackerInfoFacets = <RecordFacet<TrackerInfo>>[
   RecordFacet(
     RecordFacetKind.network,
     (info) => [info.metadata.network],
+    offered: true,
+    order: const ['tcp', 'udp'],
     labelOf: (value) => value.toUpperCase(),
   ),
   RecordFacet(
@@ -341,8 +343,13 @@ final trackerInfoFacets = <RecordFacet<TrackerInfo>>[
           ? info.rule
           : trackerRuleText(currentAppLocalizations, info),
     ],
+    offered: true,
   ),
-  RecordFacet(RecordFacetKind.mitm, (info) => [if (info.metadata.mitm) 'MITM']),
+  RecordFacet(
+    RecordFacetKind.mitm,
+    (info) => [if (info.metadata.mitm) 'MITM'],
+    offered: true,
+  ),
   RecordFacet(RecordFacetKind.app, (info) => [info.metadata.process]),
   RecordFacet(RecordFacetKind.proxy, (info) => info.chains),
 ];

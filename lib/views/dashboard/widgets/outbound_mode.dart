@@ -51,7 +51,7 @@ class OutboundModeCard extends ConsumerWidget {
                     first: index == 0,
                     last: index == Mode.values.length - 1,
                     outer: _outer,
-                    inner: 12,
+                    inner: _outer,
                     background: tone,
                     semanticLabel: item.label,
                     onTap: () => _changeMode(ref, item),

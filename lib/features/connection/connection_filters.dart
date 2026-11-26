@@ -52,6 +52,7 @@ class ConditionFilterController<T extends Object, S extends Enum>
   late S _status = statuses.first;
   var _conditions = <RecordCondition<T>>[];
   var _statusCounts = <S, int>{};
+  DateTime? _optionsAt;
   List<T> Function() _offered = () => const [];
 
   ConditionFilterController({
@@ -282,11 +283,24 @@ class ConditionFilterController<T extends Object, S extends Enum>
   /// [items] is read only when a draft needs them.
   void offerCounts(Map<S, int> statusCounts, List<T> Function() items) {
     _offered = items;
+    final now = DateTime.now();
+    final last = _optionsAt;
+    if (last == null || now.difference(last) >= const Duration(seconds: 2)) {
+      _optionsAt = now;
+      super.offer(items());
+    }
     if (MapEquality<S, int>().equals(statusCounts, _statusCounts)) {
       return;
     }
     _statusCounts = statusCounts;
     _counted.value++;
+  }
+
+  bool isValueSelected(RecordFacetKind kind, String value) =>
+      filters.contains(RecordFilter(kind, value));
+
+  void toggleValue(RecordFacetKind kind, String value) {
+    toggle(RecordFilter(kind, value));
   }
 
   @override

@@ -96,7 +96,8 @@ void main() {
       tester.element(find.byType(OutboundModeCard)),
     ).colorScheme;
     expect(decorationOf(tester, Mode.rule).color, colorScheme.primary);
-    final innerRadius = startRadiusOf(tester, Mode.direct);
+    final restRadius = startRadiusOf(tester, Mode.direct);
+    expect(restRadius, startRadiusOf(tester, Mode.rule));
 
     await tester.tap(buttonOf(Mode.direct));
     await tester.pumpAndSettle();
@@ -104,7 +105,11 @@ void main() {
     expect(container.read(patchClashConfigProvider).mode, Mode.direct);
     expect(decorationOf(tester, Mode.direct).color, colorScheme.primary);
     expect(decorationOf(tester, Mode.rule).color, isNot(colorScheme.primary));
-    expect(startRadiusOf(tester, Mode.direct), greaterThan(innerRadius));
+    expect(startRadiusOf(tester, Mode.direct), restRadius);
+    expect(
+      startRadiusOf(tester, Mode.direct),
+      startRadiusOf(tester, Mode.rule),
+    );
   });
 
   testWidgets('the modes keep their fills with glass on', (tester) async {

@@ -20,7 +20,7 @@ class ConditionFilterRow<T extends Object, S extends Enum>
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, controller.options]),
       builder: (context, _) => Padding(
         padding: EdgeInsets.symmetric(horizontal: context.listInsets.margin),
         child: Column(
@@ -47,10 +47,45 @@ class ConditionFilterRow<T extends Object, S extends Enum>
                 ),
               ],
             ),
+            _ValueChips(controller: controller),
             if (ConditionBlock.showsFor(controller))
               ConditionBlock<T>(controller: controller),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The values the offered facets take, each a toggle on the list.
+class _ValueChips<T extends Object, S extends Enum> extends StatelessWidget {
+  const _ValueChips({required this.controller});
+
+  final ConditionFilterController<T, S> controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <Widget>[];
+    final options = controller.options.value;
+    for (final facet in controller.facets) {
+      for (final value in options[facet.kind] ?? const <String>[]) {
+        chips.add(
+          Chip(
+            label: facet.label(value),
+            selected: controller.isValueSelected(facet.kind, value),
+            onPressed: () => controller.toggleValue(facet.kind, value),
+          ),
+        );
+      }
+    }
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      height: TonalButtonSize.section.button,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(spacing: 8, children: chips),
       ),
     );
   }
