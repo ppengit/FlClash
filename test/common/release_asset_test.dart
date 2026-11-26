@@ -111,6 +111,23 @@ void main() {
     });
   });
 
+  test('custom release asset names match the Windows packager and updater', () {
+    const tag = 'v0.9.5-custom.1';
+    const asset = (
+      os: ReleaseOs.windows,
+      arch: ReleaseArch.amd64,
+      form: ReleaseForm.setup,
+      extension: 'exe',
+    );
+
+    expect(namesReleaseFiles(tag), isTrue);
+    expect(
+      updateAssetName(tag, asset),
+      'FlClash-0.9.5-custom.1-windows-amd64-setup.exe',
+    );
+    expect(updateChecksumsName(tag), 'FlClash-0.9.5-custom.1-SHA256SUMS');
+  });
+
   test('a tag carrying a path names no release file', () {
     const asset = (
       os: ReleaseOs.macos,

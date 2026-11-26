@@ -99,6 +99,25 @@ void main() {
   });
 
   group('installedReleaseVersion', () {
+    test(
+      'custom releases compare by their embedded tag, not the base version',
+      () {
+        final installed = installedReleaseVersion(
+          '0.9.5',
+          builtTag: 'v0.9.5-custom.1',
+        );
+
+        expect(_v('v0.9.5-custom.1').compareTo(installed), 0);
+        expect(_v('v0.9.5-custom.2'), greaterThan(installed));
+        expect(_v('v0.9.5-custom.10'), greaterThan(_v('v0.9.5-custom.2')));
+        expect(installed.line, ReleaseLine.dev);
+        expect(
+          installedVersionLabel('0.9.5', builtTag: 'v0.9.5-custom.1'),
+          'v0.9.5-custom.1',
+        );
+      },
+    );
+
     test('prefers the tag the build was made from', () {
       expect(
         installedReleaseVersion('1.2.0', builtTag: 'v1.2.0-pre.3+1').toString(),

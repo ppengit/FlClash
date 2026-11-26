@@ -736,7 +736,7 @@ jobs:
           echo "$CA_BUNDLE_SHA256  $bundle" | sha256sum -c -
 
       - name: Package Windows amd64
-        run: dart tool/package.dart windows --tag "${{ github.ref_name }}" --env pre --targets exe,zip --arch amd64 -v
+        run: dart tool/package.dart windows --tag "${{ github.ref_name }}" --env stable --targets exe,zip --arch amd64 -v
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -812,7 +812,16 @@ jobs:
           {
             echo "# FlClash custom $version"
             echo
-            echo "Windows amd64 packages built from ${{ github.sha }} after the full repository check suite."
+            echo "Based on upstream v${version%%-custom.*}. Windows amd64 packages built from ${{ github.sha }} after the full repository check suite."
+            echo
+            echo '<!-- flclash:changelog:begin -->'
+            echo '- Keep navigation working after display changes and converge overlapping profile changes and TUN authorization.'
+            echo '- Explain profile-specific and global rules, script scope, rule-set activation, and when changes apply.'
+            echo '- Add rules from request records with domain, IP and process prefills, choosing this profile or all URL/file profiles.'
+            echo '- Add an independent persistent Hide error proxies option; keep unmeasured proxies visible and reuse display settings across profiles.'
+            echo '<!-- flclash:changelog:end -->'
+            echo
+            echo '## Downloads'
             echo
             while IFS= read -r name; do
               echo "- [${name}](https://github.com/${{ github.repository }}/releases/download/$TAG/${name})"
