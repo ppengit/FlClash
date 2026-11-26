@@ -80,6 +80,7 @@ Future<void> showTrackerRuleForm(
               : StatefulBuilder(
                   builder: (context, setState) => ListItem<_RuleScope>.options(
                     title: Text(appLocalizations.ruleScope),
+                    subtitle: Text(appLocalizations.advancedAddedRulesDesc),
                     options: _RuleScope.values,
                     value: scope,
                     textBuilder: (value) => switch (value) {

@@ -2215,10 +2215,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ruleActionDomainDesc => '匹配完整域名';
 
   @override
-  String get ruleActionDomainSuffixDesc => '匹配域名后缀';
+  String get ruleActionDomainSuffixDesc => '域名后缀';
 
   @override
-  String get ruleActionDomainKeywordDesc => '匹配域名关键字';
+  String get ruleActionDomainKeywordDesc => '域名包含';
 
   @override
   String get ruleActionDomainRegexDesc => '使用域名正则表达式匹配';

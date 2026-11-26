@@ -262,6 +262,46 @@ typedef _Target = ({String name, bool exit});
 
 const _Target _newExit = (name: '', exit: true);
 
+String _ruleExample(RuleAction action) => switch (action) {
+  RuleAction.DOMAIN => 'example.com',
+  RuleAction.DOMAIN_SUFFIX => 'example.com',
+  RuleAction.DOMAIN_KEYWORD => 'example',
+  RuleAction.DOMAIN_REGEX => r'^.+\.example\.com$',
+  RuleAction.DOMAIN_WILDCARD => '*.example.com',
+  RuleAction.GEOSITE => 'category-ads-all',
+  RuleAction.IP_CIDR => '192.0.2.0/24',
+  RuleAction.IP_CIDR6 => '2001:db8::/32',
+  RuleAction.IP_SUFFIX => '192.0.2.0/24',
+  RuleAction.IP_ASN => '13335',
+  RuleAction.GEOIP => 'US',
+  RuleAction.SRC_GEOIP => 'US',
+  RuleAction.SRC_IP_ASN => '13335',
+  RuleAction.SRC_IP_CIDR => '192.0.2.0/24',
+  RuleAction.SRC_IP_SUFFIX => '192.0.2.0/24',
+  RuleAction.DST_PORT => '443',
+  RuleAction.SRC_PORT => '1024-65535',
+  RuleAction.IN_PORT => '7890',
+  RuleAction.IN_TYPE => 'SOCKS',
+  RuleAction.IN_USER => 'alice/bob',
+  RuleAction.IN_NAME => 'inbound',
+  RuleAction.REMATCH_NAME => 'rematch',
+  RuleAction.PROCESS_PATH => r'C:\Apps\app.exe',
+  RuleAction.PROCESS_PATH_REGEX => r'.*[\\/]app\.exe$',
+  RuleAction.PROCESS_PATH_WILDCARD => r'*\app.exe',
+  RuleAction.PROCESS_NAME => 'app.exe',
+  RuleAction.PROCESS_NAME_REGEX => r'^app(?:\.exe)?$',
+  RuleAction.PROCESS_NAME_WILDCARD => 'app*',
+  RuleAction.UID => '1000',
+  RuleAction.NETWORK => 'TCP',
+  RuleAction.DSCP => '46',
+  RuleAction.RULE_SET => 'my-rules',
+  RuleAction.AND => '((DOMAIN,example.com),(NETWORK,TCP))',
+  RuleAction.OR => '((DOMAIN,example.com),(NETWORK,TCP))',
+  RuleAction.NOT => '((DOMAIN,example.com))',
+  RuleAction.SUB_RULE => '(DOMAIN,example.com)',
+  RuleAction.MATCH => '',
+};
+
 class RuleForm extends StatefulWidget {
   final Rule? rule;
 
@@ -388,8 +428,26 @@ class _RuleFormState extends State<RuleForm> {
     );
   }
 
-  String _targetLabel(_Target target) =>
-      target == _newExit ? context.appLocalizations.customExit : target.name;
+  String _ruleActionLabel(RuleAction action) =>
+      '${action.value} (${action.getDesc(context)})';
+
+  String _targetLabel(_Target target) {
+    if (target == _newExit) {
+      return context.appLocalizations.customExit;
+    }
+    if (target.exit) {
+      return target.name;
+    }
+    if (target.name == GroupName.GLOBAL.name) {
+      return '${target.name} (${context.appLocalizations.ruleTargetGlobal})';
+    }
+    final ruleTarget = RuleTarget.values
+        .where((value) => value.value == target.name)
+        .firstOrNull;
+    return ruleTarget == null
+        ? target.name
+        : '${target.name} (${ruleTarget.localizedLabel})';
+  }
 
   void _handleTarget(_Target target) {
     setState(() {
@@ -451,13 +509,16 @@ class _RuleFormState extends State<RuleForm> {
       children: [
         generateSection(
           title: appLocalizations.basicInfo,
+          footer: appLocalizations.ruleContentExample(
+            _ruleExample(_ruleAction),
+          ),
           items: [
             ?widget.scope,
             ListItem<RuleAction>.options(
               title: Text(appLocalizations.proxyType),
               options: RuleAction.addedRuleActions,
               value: _ruleAction,
-              textBuilder: (action) => action.value,
+              textBuilder: _ruleActionLabel,
               onChanged: (action) {
                 setState(() {
                   if (widget.suggestedContents.isNotEmpty) {
@@ -474,7 +535,9 @@ class _RuleFormState extends State<RuleForm> {
               invalid: issue?.field == _RuleField.content,
               trailing: FormRowTextField(
                 controller: _contentController,
-                hintText: appLocalizations.inputRuleContent,
+                hintText: appLocalizations.ruleContentExample(
+                  _ruleExample(_ruleAction),
+                ),
                 autocorrect: false,
                 inputFormatters: TextInputLimits.limit(TextInputLimits.rule),
                 onChanged: (_) {

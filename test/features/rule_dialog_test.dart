@@ -72,13 +72,22 @@ void main() {
     final l10n = currentAppLocalizations;
     final content = find.byType(TextFormField);
     expect(tester.widget<TextFormField>(content).controller!.text, 'rule.test');
+    expect(
+      find.descendant(
+        of: find.byType(ListFooter),
+        matching: find.text(l10n.ruleContentExample('example.com')),
+      ),
+      findsOneWidget,
+    );
     await tester.enterText(content, 'edited.test');
 
     Future<void> selectType(RuleAction action) async {
       await tester.tap(find.text(l10n.proxyType));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text(action.value).last);
-      await tester.tap(find.text(action.value).last);
+      final label =
+          '${action.value} (${action.getDesc(tester.element(find.byType(RuleForm)))})';
+      await tester.ensureVisible(find.text(label).last);
+      await tester.tap(find.text(label).last);
       await tester.pumpAndSettle();
     }
 
@@ -86,6 +95,13 @@ void main() {
     expect(
       tester.widget<TextFormField>(content).controller!.text,
       '192.0.2.10/32',
+    );
+    expect(
+      find.descendant(
+        of: find.byType(ListFooter),
+        matching: find.text(l10n.ruleContentExample('192.0.2.0/24')),
+      ),
+      findsOneWidget,
     );
     await selectType(RuleAction.DOMAIN);
     expect(
@@ -102,6 +118,89 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'Chinese rule help updates without changing content or wire values',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      Rule? result;
+      await tester.pumpWidget(
+        TestApp(
+          locale: const Locale('zh'),
+          wrapInProviderScope: true,
+          overrides: [
+            viewSizeProvider.overrideWithBuild(
+              (_, _) => const Size(1200, 1000),
+            ),
+          ],
+          child: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () async {
+                result = await showFormSheet<Rule>(
+                  context: context,
+                  builder: (_) => const RuleForm(
+                    suggestedContents: {RuleAction.DOMAIN: 'already.test'},
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      final l = currentAppLocalizations;
+      final content = find.byType(TextFormField);
+      expect(l.ruleScopeProfile, '当前配置');
+      expect(l.ruleScopeGlobal, '所有配置');
+      expect(find.text('DIRECT (直连)'), findsOneWidget);
+
+      Future<void> selectType(RuleAction action) async {
+        await tester.tap(find.text(l.proxyType));
+        await tester.pumpAndSettle();
+        final label =
+            '${action.value} (${action.getDesc(tester.element(find.byType(RuleForm)))})';
+        await tester.ensureVisible(find.text(label).last);
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+
+      Finder example(String value) => find.descendant(
+        of: find.byType(ListFooter),
+        matching: find.text(l.ruleContentExample(value)),
+      );
+
+      await selectType(RuleAction.PROCESS_NAME_REGEX);
+      expect(example(r'^app(?:\.exe)?$'), findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(content).controller!.text,
+        'already.test',
+      );
+      await selectType(RuleAction.DOMAIN_SUFFIX);
+      expect(find.text('DOMAIN-SUFFIX (域名后缀)'), findsOneWidget);
+      expect(example('example.com'), findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(content).controller!.text,
+        'already.test',
+      );
+      await tester.tap(find.text(l.splitStrategy));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('REJECT (拒绝连接)').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, l.save));
+      await tester.pumpAndSettle();
+
+      expect(result!.ruleAction, RuleAction.DOMAIN_SUFFIX);
+      expect(result!.content, 'already.test');
+      expect(result!.ruleTarget, 'REJECT');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('a large explicit target list builds only its visible choices', (
     tester,

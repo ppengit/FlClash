@@ -209,3 +209,17 @@ extension ServiceStartFailureL10n on ServiceStartFailure {
     };
   }
 }
+
+extension RuleTargetL10n on RuleTarget {
+  String get localizedLabel {
+    final appLocalizations = currentAppLocalizations;
+    return switch (this) {
+      RuleTarget.DIRECT => appLocalizations.direct,
+      RuleTarget.REJECT => appLocalizations.ruleTargetReject,
+      RuleTarget.REJECT_DROP => appLocalizations.ruleTargetRejectDrop,
+      RuleTarget.PASS => appLocalizations.ruleTargetPass,
+      RuleTarget.PASS_RULE => appLocalizations.ruleTargetPassRule,
+      RuleTarget.COMPATIBLE => appLocalizations.ruleTargetCompatible,
+    };
+  }
+}
