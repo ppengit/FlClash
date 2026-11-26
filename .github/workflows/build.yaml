@@ -647,3 +647,172 @@ jobs:
           target-branch: main
           commit-message: Update from ${{ github.ref_name }}
           target-directory: /tmp/
+
+  fork-version:
+    name: Fork version
+    if: &fork_release github.repository == 'ppengit/FlClash' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: pubspec.yaml
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve the stable fork version
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::$TAG must be a stable vX.Y.Z tag"
+            exit 1
+          fi
+          name="${BASH_REMATCH[1]}"
+          committed="$(sed -n 's/^version: .*+\([0-9]*\)$/\1/p' pubspec.yaml)"
+          build="$(date -u +%Y%m%d%H)"
+          if ((build <= ${committed:-0})); then
+            build=$((committed + 1))
+          fi
+          echo "version=$name+$build" >> "$GITHUB_OUTPUT"
+
+  fork-build-windows:
+    name: Fork Windows amd64 package
+    if: *fork_release
+    needs: fork-version
+    runs-on: windows-2022
+    steps:
+      - name: Enable git long paths
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Apply the tag's version
+        shell: bash
+        env:
+          VERSION: ${{ needs.fork-version.outputs.version }}
+        run: sed "s/^version: .*/version: $VERSION/" pubspec.yaml > pubspec.yaml.tmp && mv pubspec.yaml.tmp pubspec.yaml
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+          cache-dependency-path: core/go.sum
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: false
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Fetch CA certificates
+        shell: bash
+        env:
+          CA_BUNDLE: cacert-2026-09-25.pem
+          CA_BUNDLE_SHA256: a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505
+        run: |
+          bundle=core/Clash.Meta/component/ca/ca-certificates.crt
+          curl -fsSL --retry 3 -o "$bundle" "https://curl.se/ca/$CA_BUNDLE"
+          echo "$CA_BUNDLE_SHA256  $bundle" | sha256sum -c -
+
+      - name: Package Windows amd64
+        run: dart tool/package.dart windows --tag "${{ github.ref_name }}" --env pre --targets exe,zip --arch amd64 -v
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-fork-windows
+          path: ./dist
+          overwrite: true
+
+  fork-upload:
+    name: Publish fork release
+    if: *fork_release
+    needs:
+      - fork-version
+      - fork-build-windows
+      - dart
+      - plugins
+      - go
+      - android
+      - rust
+      - windows-helper-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifact-fork-windows
+          path: ./artifacts/windows
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: false
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Skip native build hooks
+        run: yq -i '.hooks.user_defines.setup.build_assets = false | .hooks.user_defines.rust_api.build_assets = false' pubspec.yaml
+
+      - name: Merge and verify Windows artifacts
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          dart tool/package.dart merge artifacts/windows --out dist
+          version="${TAG#v}"
+          jq -e --arg version "$version" --arg commit "$GITHUB_SHA" \
+            '.artifacts | length == 2 and all(.[]; .os == "windows" and .arch == "amd64" and .version == $version and .commit == $commit and .size > 0)' \
+            dist/manifest.json >/dev/null
+          for suffix in windows-amd64-setup.exe windows-amd64-portable.zip; do
+            name="FlClash-${version}-${suffix}"
+            jq -e --arg name "$name" '.artifacts | map(select(.name == $name)) | length == 1' dist/manifest.json >/dev/null
+            test -s "dist/$name"
+          done
+          (cd dist && sha256sum -c "FlClash-${version}-SHA256SUMS")
+
+      - name: Write fork release notes
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(jq -r '.artifacts[0].version' dist/manifest.json)
+          {
+            echo "# FlClash custom $version"
+            echo
+            echo "Windows amd64 packages built from ${{ github.sha }} after the full repository check suite."
+            echo
+            while IFS= read -r name; do
+              echo "- [${name}](https://github.com/${{ github.repository }}/releases/download/$TAG/${name})"
+            done < <(jq -r '.artifacts[].name' dist/manifest.json)
+          } > release.md
+
+      - name: Publish fork release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FlClash custom ${{ needs.fork-version.outputs.version }}
+          files: ./dist/*
+          body_path: ./release.md

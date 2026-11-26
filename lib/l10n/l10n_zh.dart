@@ -724,6 +724,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ruleProviders => '规则集';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      '供自定义配置复用的规则资源；通过 RULE-SET 或 DNS 的 rule-set 策略引用后才生效，仅导入不会改变分流。';
+
+  @override
   String get providerUrlTip => '仅支持远程资源';
 
   @override
@@ -1469,6 +1473,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get script => '脚本';
 
   @override
+  String get advancedScriptsDesc => '共享脚本库；只有配置的扩展设置选中脚本后才会运行。';
+
+  @override
   String get color => '颜色';
 
   @override
@@ -1587,10 +1594,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addedRules => '附加规则';
 
   @override
+  String get advancedAddedRulesDesc =>
+      '作用于 URL 和文件配置，切换订阅后仍生效，可在各配置中逐条禁用；自定义配置使用自己的规则。';
+
+  @override
+  String get profileAddedRulesDesc => '仅作用于当前配置；在脚本之后、已启用的全局附加规则及配置自身规则之前匹配。';
+
+  @override
   String get addedRulesAfterScript => '在脚本之后插入，排在配置规则前面';
 
   @override
   String get controlGlobalAddedRules => '控制全局附加规则';
+
+  @override
+  String get globalAddedRulesDesc => '仅控制当前配置使用哪些全局规则；不会改变其他配置的启用状态。';
 
   @override
   String get quickActions => '快捷操作';
@@ -1620,7 +1637,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extendScript => '扩展脚本';
 
   @override
+  String get profileScriptDesc => '仅作用于当前配置，在生成配置时、附加规则之前运行；其他配置需分别选中此脚本。';
+
+  @override
+  String get profileExtendApplyDesc => '离开本页后自动应用，也可点击“立即应用”。未在使用的配置会在下次选中时生效。';
+
+  @override
   String get goToConfigureScript => '前往配置脚本';
+
+  @override
+  String get scriptsLibraryDesc => '这里保存脚本定义；在配置的扩展设置中选中后才会运行。';
 
   @override
   String get goToConfigureAddedRules => '前往配置附加规则';

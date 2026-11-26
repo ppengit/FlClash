@@ -76,6 +76,18 @@ class _ApplyRecordingSetupAction extends SetupAction {
   }
 }
 
+class _ProfileRecordingSetupAction extends SetupAction {
+  final profiles = <int?>[];
+
+  @override
+  Future<bool> fullSetup() async {
+    if (ref.read(initProvider)) {
+      profiles.add(ref.read(currentProfileIdProvider));
+    }
+    return true;
+  }
+}
+
 class _LostRecordingSetupAction extends SetupAction {
   int lostCount = 0;
 
@@ -537,6 +549,29 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('initialization replays only the latest pending profile switch', (
+    tester,
+  ) async {
+    final setup = _ProfileRecordingSetupAction();
+    final container = await _pumpCoreManager(
+      tester,
+      _coreInterface(),
+      overrides: [setupActionProvider.overrideWith(() => setup)],
+    );
+    container.read(currentProfileIdProvider.notifier).value = 1;
+    await tester.pump();
+    container.read(currentProfileIdProvider.notifier).value = 2;
+    await tester.pump();
+    expect(setup.profiles, isEmpty);
+
+    container.read(initProvider.notifier).value = true;
+    await tester.pump();
+    await tester.pump();
+
+    expect(setup.profiles, [2]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   group('profile switch failure', () {
     late Profile previous;
     late Profile next;
@@ -580,7 +615,7 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
-    testWidgets('rapid A -> B -> C settles on C even when both are rejected', (
+    testWidgets('rapid A -> B -> C applies only C even when it is rejected', (
       tester,
     ) async {
       final coreInterface = _coreInterface();
@@ -609,10 +644,10 @@ void main() {
 
       container.read(currentProfileIdProvider.notifier).value = b.id;
       container.read(currentProfileIdProvider.notifier).value = c.id;
-      await _waitForSetupToSettle(tester, () => setupCalls >= 2);
+      await _waitForSetupToSettle(tester, () => setupCalls >= 1);
 
       expect(container.read(currentProfileIdProvider), c.id);
-      expect(setupCalls, 2);
+      expect(setupCalls, 1);
 
       await tester.pumpWidget(const SizedBox.shrink());
     });

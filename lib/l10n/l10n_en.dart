@@ -747,6 +747,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ruleProviders => 'Rule providers';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      'Reusable resources for custom profiles; reference them with RULE-SET or a DNS rule-set policy to apply. Importing alone changes no traffic.';
+
+  @override
   String get providerUrlTip => 'Only remote providers are supported';
 
   @override
@@ -1508,6 +1512,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get script => 'Script';
 
   @override
+  String get advancedScriptsDesc =>
+      'Shared script library; a script runs only after a profile selects it.';
+
+  @override
   String get color => 'Color';
 
   @override
@@ -1627,11 +1635,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addedRules => 'Added rules';
 
   @override
+  String get advancedAddedRulesDesc =>
+      'Applies to URL and file profiles across subscription switches, unless disabled per profile. Custom profiles use their own rules.';
+
+  @override
+  String get profileAddedRulesDesc =>
+      'Only this profile; after its script, before enabled global rules and the profile’s source rules.';
+
+  @override
   String get addedRulesAfterScript =>
       'Inserted after the script runs, ahead of the profile\'s rules';
 
   @override
   String get controlGlobalAddedRules => 'Control global added rules';
+
+  @override
+  String get globalAddedRulesDesc =>
+      'Choose which global rules apply to this profile only; other profiles keep their own choices.';
 
   @override
   String get quickActions => 'Quick actions';
@@ -1661,7 +1681,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get extendScript => 'Extend script';
 
   @override
+  String get profileScriptDesc =>
+      'Only this profile; runs when its config is generated, before added rules. Other profiles must select it separately.';
+
+  @override
+  String get profileExtendApplyDesc =>
+      'Changes apply when leaving this page or choosing Apply now. An inactive profile uses them the next time it is selected.';
+
+  @override
   String get goToConfigureScript => 'Go to script configuration';
+
+  @override
+  String get scriptsLibraryDesc =>
+      'Scripts stored here are definitions; select one in a profile to run it.';
 
   @override
   String get goToConfigureAddedRules => 'Go to added rules configuration';

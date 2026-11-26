@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/core/spill.dart';
@@ -62,6 +63,73 @@ class _UnflooredDebounceSetupAction extends SetupAction {
 class _CappedDebounceSetupAction extends _UnflooredDebounceSetupAction {
   @override
   Duration get maxApplyDebounce => const Duration(milliseconds: 300);
+}
+
+class _OrchestratedSetupAction extends SetupAction {
+  Future<void> Function(int? profileId)? beforeBuild;
+  final builtProfiles = <int?>[];
+  final listenerChanges = <bool>[];
+  var authorizationCalls = 0;
+
+  @override
+  Future<AuthorizeCode> authorizeCore() async {
+    authorizationCalls++;
+    return AuthorizeCode.success;
+  }
+
+  @override
+  Future<BuiltProfile> getProfile({
+    required SetupState setupState,
+    required PatchClashConfig patchConfig,
+  }) async {
+    builtProfiles.add(setupState.profileId);
+    await beforeBuild?.call(setupState.profileId);
+    final yaml = 'profile-id: ${setupState.profileId}\n';
+    return (
+      yaml: yaml,
+      md5: yaml.toMd5(),
+      counts: configCountsOf(const {}),
+      base: null,
+    );
+  }
+
+  @override
+  Future<void> setCoreRunning(bool running) async {
+    listenerChanges.add(running);
+  }
+
+  @override
+  void resetCoreTraffic() {}
+}
+
+class _OrchestratedCoreAction extends CoreAction {
+  var restarts = 0;
+  var failAuthorizedRestart = false;
+
+  @override
+  Future<void> initCore() async {}
+
+  @override
+  Future<CoreLifecycleResult> restartLifecycle() async {
+    restarts++;
+    if (failAuthorizedRestart && restarts == 2) {
+      throw StateError('authorized restart failed');
+    }
+    return CoreLifecycleResult(
+      revision: restarts,
+      outcome: CoreLifecycleOutcome.applied,
+    );
+  }
+}
+
+class _ReadyProxiesAction extends ProxiesAction {
+  @override
+  Future<void> updateGroups() async {}
+}
+
+class _ReadyProviders extends Providers {
+  @override
+  Future<void> syncProviders() async {}
 }
 
 class TestCommonAction extends CommonAction {
@@ -1199,6 +1267,165 @@ void main() {
       overrides: ProfileOverrides(),
     );
 
+    ({ProviderContainer container, List<String> pushed}) orchestratedSetup(
+      List<Profile> profiles,
+      _OrchestratedSetupAction setup, {
+      _OrchestratedCoreAction? coreAction,
+    }) {
+      final core = _MockCoreHandlerInterface();
+      final pushed = <String>[];
+      when(() => core.setupConfig(any())).thenAnswer((_) async {
+        pushed.add(await File(await appPath.configFilePath).readAsString());
+      });
+      final scoped = ProviderContainer(
+        overrides: [
+          profilesProvider.overrideWith(() => TestProfiles(profiles)),
+          currentProfileIdProvider.overrideWithBuild(
+            (_, _) => profiles.firstOrNull?.id,
+          ),
+          setupStateProvider.overrideWith(
+            (_, profileId) =>
+                nullProfileSetupState.copyWith(profileId: profileId),
+          ),
+          coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          setupActionProvider.overrideWith(() => setup),
+          if (coreAction != null)
+            coreActionProvider.overrideWith(() => coreAction),
+          proxiesActionProvider.overrideWith(_ReadyProxiesAction.new),
+          providersProvider.overrideWith(_ReadyProviders.new),
+          commonActionProvider.overrideWith(TestCommonAction.new),
+          networkSettingProvider.overrideWithBuild(
+            (_, _) => const NetworkProps(bypassPrivateRoute: false),
+          ),
+        ],
+      );
+      addTearDown(scoped.dispose);
+      globalState.container = scoped;
+      scoped.listen(currentProfileIdProvider, (_, _) {});
+      scoped.read(setupActionProvider.notifier);
+      if (coreAction != null) {
+        scoped.read(coreActionProvider.notifier);
+      }
+      return (container: scoped, pushed: pushed);
+    }
+
+    for (final running in [false, true]) {
+      test('authorization during a ${running ? 'running' : 'stopped'} restart '
+          'hands back to the restart worker', () async {
+        final setup = _OrchestratedSetupAction();
+        final coreAction = _OrchestratedCoreAction();
+        final (:container, :pushed) = orchestratedSetup(
+          [Profile.normal(label: 'p')],
+          setup,
+          coreAction: coreAction,
+        );
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+        if (running) {
+          container.read(runTimeProvider.notifier).value = 0;
+        }
+
+        expect(
+          await coreAction.restartCore().timeout(const Duration(seconds: 2)),
+          isTrue,
+        );
+        expect(coreAction.restarts, 2);
+        expect(setup.authorizationCalls, 1);
+        expect(pushed, hasLength(1));
+        expect(setup.listenerChanges, running ? [true] : isEmpty);
+
+        expect(await coreAction.restartCore(), isTrue);
+        expect(coreAction.restarts, 3);
+        await setup.setRunning(false);
+      });
+    }
+
+    test(
+      'a failed authorized restart releases the worker and authorization',
+      () async {
+        final setup = _OrchestratedSetupAction();
+        final coreAction = _OrchestratedCoreAction()
+          ..failAuthorizedRestart = true;
+        final (:container, pushed: _) = orchestratedSetup(
+          [Profile.normal(label: 'p')],
+          setup,
+          coreAction: coreAction,
+        );
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+
+        await expectLater(
+          coreAction.restartCore().timeout(const Duration(seconds: 2)),
+          throwsStateError,
+        );
+        expect(
+          container.read(authorizedTunEnableProvider),
+          TunAuthorizationState.none,
+        );
+        expect(await coreAction.restartCore(), isTrue);
+      },
+    );
+
+    test(
+      'a blocked profile build is superseded by the latest forced apply',
+      () async {
+        final a = Profile.normal(label: 'a');
+        final b = Profile.normal(label: 'b');
+        final c = Profile.normal(label: 'c');
+        final started = Completer<void>();
+        final release = Completer<void>();
+        final setup = _OrchestratedSetupAction()
+          ..beforeBuild = (profileId) async {
+            if (profileId == a.id) {
+              started.complete();
+              await release.future;
+            }
+          };
+        final (:container, :pushed) = orchestratedSetup([a, b, c], setup);
+        final first = setup.applyProfile(force: true, silence: true);
+        await started.future;
+        container.read(currentProfileIdProvider.notifier).value = b.id;
+        final second = setup.applyProfile(force: true, silence: true);
+        container.read(currentProfileIdProvider.notifier).value = c.id;
+        final third = setup.applyProfile(silence: true);
+        release.complete();
+        await Future.wait([first, second, third]);
+
+        expect(setup.builtProfiles, [a.id, c.id]);
+        expect(pushed, ['profile-id: ${c.id}\n']);
+      },
+    );
+
+    test(
+      'an initializing start follows a selection made during its build',
+      () async {
+        final a = Profile.normal(label: 'a');
+        final b = Profile.normal(label: 'b');
+        final started = Completer<void>();
+        final release = Completer<void>();
+        final setup = _OrchestratedSetupAction()
+          ..beforeBuild = (profileId) async {
+            if (profileId == a.id) {
+              started.complete();
+              await release.future;
+            }
+          };
+        final (:container, :pushed) = orchestratedSetup([a, b], setup);
+        final start = setup.setRunning(true, initialize: true);
+        await started.future;
+        container.read(currentProfileIdProvider.notifier).value = b.id;
+        expect(await setup.fullSetup(), isTrue);
+        release.complete();
+        expect(await start, isTrue);
+
+        expect(pushed, ['profile-id: ${b.id}\n']);
+        expect(setup.listenerChanges, [true]);
+        await setup.setRunning(false);
+      },
+    );
+
     test(
       'a refresh failure still runs core.setupConfig and preloadInvoke',
       () async {
@@ -1841,6 +2068,51 @@ void main() {
           },
           {'a': 'ss', 'g': GroupType.Selector},
         );
+      },
+    );
+
+    test(
+      'watched profile outbounds reload only when its content changes',
+      () async {
+        final profile = Profile.normal(label: 'p');
+        var name = 'before';
+        final core = _MockCoreHandlerInterface();
+        when(() => core.getProfileOutbounds(any())).thenAnswer(
+          (_) async => {
+            'proxies': [
+              {'name': name, 'type': 'ss'},
+            ],
+            'proxy-groups': <Map<String, dynamic>>[],
+          },
+        );
+        final scoped = ProviderContainer(
+          overrides: [
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          ],
+        );
+        addTearDown(scoped.dispose);
+        final provider = clashConfigProvider(profile.id);
+        scoped.listen(provider, (_, _) {});
+        expect(
+          (await scoped.read(provider.future)).proxies.single.name,
+          'before',
+        );
+        scoped
+            .read(profilesProvider.notifier)
+            .put(profile.copyWith(label: 'p2'));
+        await scoped.pump();
+        verify(() => core.getProfileOutbounds(any())).called(1);
+
+        name = 'after';
+        scoped
+            .read(profilesProvider.notifier)
+            .put(profile.copyWith(lastUpdateDate: DateTime(2026, 11, 26)));
+        expect(
+          (await scoped.read(provider.future)).proxies.single.name,
+          'after',
+        );
+        verify(() => core.getProfileOutbounds(any())).called(1);
       },
     );
 

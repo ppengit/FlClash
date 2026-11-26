@@ -30,9 +30,11 @@ class ScriptContent extends ConsumerWidget {
       sliver: SliverToBoxAdapter(
         child: generateSection(
           title: appLocalizations.script,
+          footer: appLocalizations.profileExtendApplyDesc,
           items: [
             ListItem<int?>.options(
               title: Text(appLocalizations.extendScript),
+              subtitle: Text(appLocalizations.profileScriptDesc),
               options: [null, ...labels.keys],
               sectionStarts: {...labels.keys.take(1)},
               value: labels.containsKey(scriptId) ? scriptId : null,
@@ -41,6 +43,7 @@ class ScriptContent extends ConsumerWidget {
             ),
             ListItem.open(
               title: Text(appLocalizations.goToConfigureScript),
+              subtitle: Text(appLocalizations.scriptsLibraryDesc),
               widget: const ScriptsView(),
             ),
           ],

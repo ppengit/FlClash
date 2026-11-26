@@ -1524,6 +1524,12 @@ abstract class AppLocalizations {
   /// **'Rule providers'**
   String get ruleProviders;
 
+  /// No description provided for @advancedRuleProvidersDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Reusable resources for custom profiles; reference them with RULE-SET or a DNS rule-set policy to apply. Importing alone changes no traffic.'**
+  String get advancedRuleProvidersDesc;
+
   /// No description provided for @providerUrlTip.
   ///
   /// In en, this message translates to:
@@ -2922,6 +2928,12 @@ abstract class AppLocalizations {
   /// **'Script'**
   String get script;
 
+  /// No description provided for @advancedScriptsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared script library; a script runs only after a profile selects it.'**
+  String get advancedScriptsDesc;
+
   /// No description provided for @color.
   ///
   /// In en, this message translates to:
@@ -3150,6 +3162,18 @@ abstract class AppLocalizations {
   /// **'Added rules'**
   String get addedRules;
 
+  /// No description provided for @advancedAddedRulesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to URL and file profiles across subscription switches, unless disabled per profile. Custom profiles use their own rules.'**
+  String get advancedAddedRulesDesc;
+
+  /// No description provided for @profileAddedRulesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Only this profile; after its script, before enabled global rules and the profile’s source rules.'**
+  String get profileAddedRulesDesc;
+
   /// No description provided for @addedRulesAfterScript.
   ///
   /// In en, this message translates to:
@@ -3161,6 +3185,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Control global added rules'**
   String get controlGlobalAddedRules;
+
+  /// No description provided for @globalAddedRulesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which global rules apply to this profile only; other profiles keep their own choices.'**
+  String get globalAddedRulesDesc;
 
   /// No description provided for @quickActions.
   ///
@@ -3216,11 +3246,29 @@ abstract class AppLocalizations {
   /// **'Extend script'**
   String get extendScript;
 
+  /// No description provided for @profileScriptDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Only this profile; runs when its config is generated, before added rules. Other profiles must select it separately.'**
+  String get profileScriptDesc;
+
+  /// No description provided for @profileExtendApplyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes apply when leaving this page or choosing Apply now. An inactive profile uses them the next time it is selected.'**
+  String get profileExtendApplyDesc;
+
   /// No description provided for @goToConfigureScript.
   ///
   /// In en, this message translates to:
   /// **'Go to script configuration'**
   String get goToConfigureScript;
+
+  /// No description provided for @scriptsLibraryDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Scripts stored here are definitions; select one in a profile to run it.'**
+  String get scriptsLibraryDesc;
 
   /// No description provided for @goToConfigureAddedRules.
   ///

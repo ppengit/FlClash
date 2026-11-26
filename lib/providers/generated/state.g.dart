@@ -3524,7 +3524,7 @@ final class ClashConfigProvider
   }
 }
 
-String _$clashConfigHash() => r'ed8cfcf34801fae6f54b28ddcf5ea31bc49ad0ba';
+String _$clashConfigHash() => r'bb8c2d36732a15af8740df92720a8fbe436da936';
 
 final class ClashConfigFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<ClashConfig>, int> {
@@ -3604,7 +3604,7 @@ final class ScriptOutboundsProvider
   }
 }
 
-String _$scriptOutboundsHash() => r'ee0dec9a980bed9f0b2b9f35567391abd126cb8a';
+String _$scriptOutboundsHash() => r'd0429e1023bcc390681b1fac5024b8bae387d375';
 
 /// The groups a script leaves for a MATCH target; null without a script.
 

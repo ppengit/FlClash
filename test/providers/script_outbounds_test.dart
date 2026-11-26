@@ -100,6 +100,42 @@ void main() {
     ]);
   });
 
+  test('a watched script reloads the updated profile file', () async {
+    scriptEvaluator =
+        ({required String script, required String config}) async => config;
+    final profile = Profile.normal(label: 'sub').copyWith(scriptId: script.id);
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles([profile])),
+        scriptsProvider.overrideWith(() => TestScripts([script])),
+        coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = scriptOutboundsProvider(profile.id);
+    container.listen(provider, (_, _) {});
+    expect(
+      (await container.read(provider.future))!.proxyGroups.single.name,
+      'Before',
+    );
+    when(() => core.readConfig(any())).thenAnswer(
+      (_) async => <String, dynamic>{
+        'proxy-groups': [
+          {'name': 'Updated', 'type': 'select'},
+        ],
+      },
+    );
+    container
+        .read(profilesProvider.notifier)
+        .put(profile.copyWith(lastUpdateDate: DateTime(2026, 11, 26)));
+
+    expect(
+      (await container.read(provider.future))!.proxyGroups.single.name,
+      'Updated',
+    );
+    verify(() => core.readConfig(any())).called(2);
+  });
+
   test('a script that fails is an error, not the groups before it', () async {
     scriptEvaluator = ({required String script, required String config}) =>
         Future.error(StateError('main is not a function'));

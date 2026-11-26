@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
@@ -138,7 +140,7 @@ class _AddedRulesContentState extends ConsumerState<AddedRulesContent> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ListHeader(
                 title: appLocalizations.addedRules,
-                caption: appLocalizations.addedRulesAfterScript,
+                caption: appLocalizations.profileAddedRulesDesc,
                 actions: [
                   if (selectedRules.isNotEmpty) ...[
                     IconButtonData(
@@ -255,11 +257,43 @@ Set<String> _namesOf(ClashConfig config) => {
 
 /// The exits a profile's added rules and the enabled MITM modules name; a
 /// custom profile has only the modules'.
-class ExitsSection extends ConsumerWidget {
+class ExitsSection extends ConsumerStatefulWidget {
   final int profileId;
   final bool modulesOnly;
 
   const ExitsSection(this.profileId, {super.key, this.modulesOnly = false});
+
+  @override
+  ConsumerState<ExitsSection> createState() => _ExitsSectionState();
+}
+
+class _ExitsSectionState extends ConsumerState<ExitsSection> {
+  var _settleStarted = false;
+  var _settled = false;
+
+  int get profileId => widget.profileId;
+  bool get modulesOnly => widget.modulesOnly;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_settleStarted) {
+      return;
+    }
+    _settleStarted = true;
+    unawaited(_settle());
+  }
+
+  Future<void> _settle() async {
+    await whenRouteSettled(context);
+    if (!mounted) {
+      return;
+    }
+    await whenNothingAnimates();
+    if (mounted) {
+      setState(() => _settled = true);
+    }
+  }
 
   List<String> _watchExits(WidgetRef ref, Map<String, List<String>> modules) {
     if (modulesOnly) {
@@ -416,7 +450,7 @@ class ExitsSection extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final modules = ref.watch(mitmModuleExitsProvider).value ?? const {};
     final exits = _watchExits(ref, modules);
     if (exits.isEmpty) {
@@ -425,9 +459,9 @@ class ExitsSection extends ConsumerWidget {
     final exitTargets = ref.watch(
       profileProvider(profileId).select((state) => state?.exitTargets),
     );
-    final outbounds = _watchOutbounds(ref, profileId);
+    final outbounds = _settled ? _watchOutbounds(ref, profileId) : null;
     final names = outbounds == null ? null : _namesOf(outbounds);
-    final fallback = _watchFallback(ref, profileId);
+    final fallback = _settled ? _watchFallback(ref, profileId) : null;
     return generateSection(
       title: context.appLocalizations.outboundExit,
       items: [
@@ -460,6 +494,7 @@ class _GlobalAddedRulesItem extends ConsumerWidget {
     final enabled = rules.where((rule) => !disabled.contains(rule.id)).length;
     return ListItem.open(
       title: Text(context.appLocalizations.controlGlobalAddedRules),
+      subtitle: Text(context.appLocalizations.globalAddedRulesDesc),
       trailing: rules.isEmpty ? null : Text('$enabled/${rules.length}'),
       widget: _EditGlobalAddedRules(profileId),
     );

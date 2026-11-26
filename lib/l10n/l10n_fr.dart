@@ -756,6 +756,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get ruleProviders => 'Fournisseurs de règles';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      'Ressources réutilisables des profils personnalisés ; référencez-les avec RULE-SET ou une politique DNS rule-set. L’import seul ne change pas le routage.';
+
+  @override
   String get providerUrlTip =>
       'Seuls les fournisseurs distants sont pris en charge';
 
@@ -1524,6 +1528,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get script => 'Script';
 
   @override
+  String get advancedScriptsDesc =>
+      'Bibliothèque de scripts partagée ; un script ne s’exécute que s’il est sélectionné dans un profil.';
+
+  @override
   String get color => 'Couleur';
 
   @override
@@ -1643,11 +1651,23 @@ class AppLocalizationsFr extends AppLocalizations {
   String get addedRules => 'Règles ajoutées';
 
   @override
+  String get advancedAddedRulesDesc =>
+      'Pour les profils URL et fichier, même après un changement d’abonnement. Désactivables par profil. Les profils personnalisés utilisent leurs propres règles.';
+
+  @override
+  String get profileAddedRulesDesc =>
+      'Ce profil uniquement : après son script, avant les règles globales activées et ses règles d’origine.';
+
+  @override
   String get addedRulesAfterScript =>
       'Insérées après l\'exécution du script, avant les règles du profil';
 
   @override
   String get controlGlobalAddedRules => 'Gérer les règles ajoutées globales';
+
+  @override
+  String get globalAddedRulesDesc =>
+      'Choisit les règles globales de ce profil uniquement, sans changer les choix des autres profils.';
 
   @override
   String get quickActions => 'Actions rapides';
@@ -1677,7 +1697,19 @@ class AppLocalizationsFr extends AppLocalizations {
   String get extendScript => 'Script d’extension';
 
   @override
+  String get profileScriptDesc =>
+      'Ce profil uniquement : exécuté à la génération de sa configuration, avant les règles ajoutées. À sélectionner séparément dans chaque autre profil.';
+
+  @override
+  String get profileExtendApplyDesc =>
+      'Appliqué en quittant cette page ou avec le bouton d’application. Un profil inactif les utilise à sa prochaine sélection.';
+
+  @override
   String get goToConfigureScript => 'Aller à la configuration du script';
+
+  @override
+  String get scriptsLibraryDesc =>
+      'Les scripts enregistrés ici sont des définitions ; sélectionnez-en un dans un profil pour l’exécuter.';
 
   @override
   String get goToConfigureAddedRules =>

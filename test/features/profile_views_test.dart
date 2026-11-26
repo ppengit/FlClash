@@ -149,6 +149,9 @@ void main() {
       WidgetTester tester, {
       bool current = true,
       bool applied = true,
+      bool settle = true,
+      List<Rule> rules = const [],
+      void Function()? onOutboundsRead,
     }) async {
       setViewport(tester);
       final profile = Profile.normal();
@@ -159,7 +162,8 @@ void main() {
           currentProfileIdProvider.overrideWithBuild(
             (_, _) => current ? profile.id : profile.id + 1,
           ),
-          profileRulesProvider.overrideWith2((_) => _TestProfileRules([])),
+          profileRulesProvider.overrideWith2((_) => _TestProfileRules(rules)),
+          globalRulesProvider.overrideWith(TestGlobalRules.new),
           profileDisabledRuleIdsProvider.overrideWith2(
             (_) => _TestDisabledRuleIds(),
           ),
@@ -168,13 +172,15 @@ void main() {
               Script(id: 10, label: 'alpha', lastUpdateTime: DateTime(2026)),
             ]),
           ),
-          clashConfigProvider(profile.id).overrideWithValue(
-            const AsyncData(
-              ClashConfig(
-                proxies: [Proxy(name: 'DIRECT', type: 'Direct')],
-              ),
-            ),
-          ),
+          clashConfigProvider(profile.id).overrideWith((_) async {
+            onOutboundsRead?.call();
+            return const ClashConfig(
+              proxies: [Proxy(name: 'DIRECT', type: 'Direct')],
+            );
+          }),
+          profileMatchTargetProvider(
+            profile.id,
+          ).overrideWithValue(const AsyncData('DIRECT')),
           setupActionProvider.overrideWith(() => setupAction),
         ],
       );
@@ -203,7 +209,9 @@ void main() {
         ),
       );
       await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
+      if (settle) {
+        await tester.pumpAndSettle();
+      }
       return setupAction;
     }
 
@@ -221,7 +229,10 @@ void main() {
       await pumpExtendView(tester);
       final l10n = currentAppLocalizations;
       expect(find.text(l10n.none), findsOneWidget);
-      expect(find.text(l10n.addedRulesAfterScript), findsOneWidget);
+      expect(find.text(l10n.profileAddedRulesDesc), findsOneWidget);
+      expect(find.text(l10n.profileScriptDesc), findsOneWidget);
+      expect(find.text(l10n.profileExtendApplyDesc), findsOneWidget);
+      expect(find.text(l10n.globalAddedRulesDesc), findsOneWidget);
       expect(
         tester.getTopLeft(find.text(l10n.extendScript)).dy,
         lessThan(tester.getTopLeft(find.text(l10n.addedRules)).dy),
@@ -275,6 +286,35 @@ void main() {
 
       expect(applyNowButton(), findsNothing);
       expect(setupAction.applyCalls, 0);
+    });
+
+    testWidgets('reads outbound validity only after the page settles', (
+      tester,
+    ) async {
+      var reads = 0;
+      await pumpExtendView(
+        tester,
+        settle: false,
+        rules: [
+          Rule.parse('DOMAIN,example.com,Exit').copyWith(customExit: true),
+        ],
+        onOutboundsRead: () => reads++,
+      );
+      await tester.pump();
+      expect(reads, 0);
+
+      await tester.pumpAndSettle();
+      expect(reads, 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reads no outbounds when no custom exit needs validation', (
+      tester,
+    ) async {
+      var reads = 0;
+      await pumpExtendView(tester, onOutboundsRead: () => reads++);
+
+      expect(reads, 0);
     });
   });
 

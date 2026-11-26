@@ -746,6 +746,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get ruleProviders => 'Провайдеры правил';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      'Общие ресурсы пользовательских профилей; нужны ссылки RULE-SET или DNS rule-set. Сам по себе импорт не меняет маршрутизацию.';
+
+  @override
   String get providerUrlTip => 'Поддерживаются только удалённые ресурсы';
 
   @override
@@ -1507,6 +1511,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get script => 'Скрипт';
 
   @override
+  String get advancedScriptsDesc =>
+      'Общая библиотека скриптов; скрипт запускается только после выбора в профиле.';
+
+  @override
   String get color => 'Цвет';
 
   @override
@@ -1626,12 +1634,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addedRules => 'Добавленные правила';
 
   @override
+  String get advancedAddedRulesDesc =>
+      'Для URL- и файловых профилей, в том числе после смены подписки. Правила можно отключать в профиле. Пользовательские профили используют свои правила.';
+
+  @override
+  String get profileAddedRulesDesc =>
+      'Только этот профиль: после его скрипта, перед включёнными глобальными и исходными правилами.';
+
+  @override
   String get addedRulesAfterScript =>
       'Добавляются после выполнения скрипта, перед правилами профиля';
 
   @override
   String get controlGlobalAddedRules =>
       'Управление глобальными добавленными правилами';
+
+  @override
+  String get globalAddedRulesDesc =>
+      'Выбор глобальных правил только для этого профиля; настройки других профилей не меняются.';
 
   @override
   String get quickActions => 'Быстрые действия';
@@ -1661,7 +1681,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get extendScript => 'Скрипт расширения';
 
   @override
+  String get profileScriptDesc =>
+      'Только этот профиль: запускается при создании конфигурации, перед добавленными правилами. В других профилях его нужно выбрать отдельно.';
+
+  @override
+  String get profileExtendApplyDesc =>
+      'Изменения применяются при выходе или по кнопке применения. Для неактивного профиля — при следующем выборе.';
+
+  @override
   String get goToConfigureScript => 'Перейти к настройке скрипта';
+
+  @override
+  String get scriptsLibraryDesc =>
+      'Сохранённые здесь скрипты — это определения; выберите скрипт в профиле, чтобы запустить его.';
 
   @override
   String get goToConfigureAddedRules =>

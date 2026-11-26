@@ -1,5 +1,9 @@
 part of '../action.dart';
 
+class _CoreRestartRequired implements Exception {
+  const _CoreRestartRequired();
+}
+
 @Riverpod(keepAlive: true)
 class CoreAction extends _$CoreAction {
   CoreController get _core => ref.read(coreHandlerProvider);
@@ -120,30 +124,39 @@ class CoreAction extends _$CoreAction {
   }
 
   Future<bool> _runRestartWorker() async {
+    var authorizedRestart = false;
     try {
-      ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
-      final result = await restartLifecycle();
-      if (!await _applyLifecycleResult(result, statusFirst: true)) {
-        return false;
-      }
-
+      var restartRequired = true;
       var appliedRevision = 0;
       var applied = true;
-      while (appliedRevision < _requestedRestartRevision) {
+      while (restartRequired || appliedRevision < _requestedRestartRevision) {
+        if (restartRequired) {
+          ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
+          final result = await restartLifecycle();
+          if (!await _applyLifecycleResult(result, statusFirst: true)) {
+            return false;
+          }
+          restartRequired = false;
+        }
         final revision = _requestedRestartRevision;
-        if (ref.read(setupActionProvider.notifier).wantsRunning) {
+        try {
           applied = await ref
               .read(setupActionProvider.notifier)
-              .setRunning(true, initialize: true);
-        } else {
-          applied = await ref
-              .read(setupActionProvider.notifier)
-              .applyProfile(force: true);
+              .restoreAfterCoreRestart();
+        } on _CoreRestartRequired {
+          // Setup cannot await the restart operation that is awaiting it.
+          authorizedRestart = true;
+          restartRequired = true;
+          continue;
         }
         appliedRevision = revision;
       }
       return applied;
     } catch (error) {
+      if (authorizedRestart) {
+        ref.read(authorizedTunEnableProvider.notifier).value =
+            TunAuthorizationState.none;
+      }
       _markStopped(error);
       rethrow;
     } finally {

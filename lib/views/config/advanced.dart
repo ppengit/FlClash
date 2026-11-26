@@ -42,11 +42,13 @@ class AdvancedConfigView extends ConsumerWidget {
       ),
       ListItem.open(
         title: Text(appLocalizations.addedRules),
+        subtitle: Text(appLocalizations.advancedAddedRulesDesc),
         leading: const GlyphIcon(AppGlyphs.rules),
         widget: const AddedRulesView(),
       ),
       ListItem.open(
         title: Text(appLocalizations.script),
+        subtitle: Text(appLocalizations.advancedScriptsDesc),
         leading: const GlyphIcon(AppGlyphs.code),
         widget: const ScriptsView(),
       ),
@@ -59,6 +61,7 @@ class AdvancedConfigView extends ConsumerWidget {
       ),
       ListItem.open(
         title: Text(appLocalizations.ruleProviders),
+        subtitle: Text(appLocalizations.advancedRuleProvidersDesc),
         leading: const GlyphIcon(AppGlyphs.resources),
         widget: const ClashProvidersView(),
       ),

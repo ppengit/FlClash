@@ -1031,6 +1031,11 @@ class _TestSetupAction extends SetupAction {
   Completer<void>? firstApplyCompleter;
 
   @override
+  Future<bool> restoreAfterCoreRestart() => wantsRunning
+      ? setRunning(true, initialize: true)
+      : applyProfile(force: true);
+
+  @override
   Future<bool> setRunning(bool running, {bool initialize = false}) async {
     setRunningCount++;
     return setRunningResult;

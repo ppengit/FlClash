@@ -1,6 +1,6 @@
 part of '../action.dart';
 
-enum _SetupTaskResult { completed, handoffToCoreRestart, failed }
+enum _SetupTaskResult { completed, superseded, handoffToCoreRestart, failed }
 
 typedef _SetupInputs = (
   SetupState,
@@ -39,6 +39,11 @@ class SetupAction extends _$SetupAction {
   Timer? _runtimeTimer;
   final _setupScheduler = SerialTaskScheduler();
   final _listenerScheduler = SerialTaskScheduler();
+  Future<_SetupTaskResult>? _setupOperation;
+  var _requestedSetupRevision = 0;
+  var _setupForce = false;
+  var _setupSilence = true;
+  Future<void> Function()? _setupPreload;
   _RunRequest? _latestRunRequest;
   DateTime? _startTime;
   var _resumeOnRestart = false;
@@ -162,6 +167,13 @@ class SetupAction extends _$SetupAction {
 
   bool get wantsRunning => ref.read(isStartProvider) || _resumeOnRestart;
 
+  Future<bool> restoreAfterCoreRestart() {
+    Future<bool> handoff() async => throw const _CoreRestartRequired();
+    return wantsRunning
+        ? _run(true, initialize: true, restartAfterAuthorization: handoff)
+        : _applyProfile(force: true, restartAfterAuthorization: handoff);
+  }
+
   /// The lost session gets no stop; work begun for the old run stops counting.
   void onCoreLost() {
     if (_startTime == null) {
@@ -188,6 +200,7 @@ class SetupAction extends _$SetupAction {
     bool running, {
     required bool initialize,
     bool resume = false,
+    Future<bool> Function()? restartAfterAuthorization,
   }) {
     final request = _RunRequest(
       running: running,
@@ -201,17 +214,30 @@ class SetupAction extends _$SetupAction {
     if (request.initialize) {
       globalState.needInitStatus = false;
     }
-    return running ? _start(request) : _stop(request);
+    return running
+        ? _start(request, restartAfterAuthorization: restartAfterAuthorization)
+        : _stop(request);
   }
 
-  Future<bool> _start(_RunRequest request) async {
+  Future<bool> _start(
+    _RunRequest request, {
+    Future<bool> Function()? restartAfterAuthorization,
+  }) async {
     if (request.initialize) {
       var applied = false;
       try {
-        applied = await applyProfile(
-          force: !request.resume,
-          preloadInvoke: () => _startCoreRunning(request),
-        );
+        applied = restartAfterAuthorization == null
+            ? await applyProfile(
+                force: !request.resume,
+                preloadInvoke: () => _startCoreRunning(request),
+              )
+            : await _applyProfile(
+                force: !request.resume,
+                preloadInvoke: () => _startCoreRunning(request),
+                restartAfterAuthorization: restartAfterAuthorization,
+              );
+      } on _CoreRestartRequired {
+        rethrow;
       } catch (error) {
         if (_isCurrent(request)) {
           dialogs.showBanner(
@@ -461,12 +487,27 @@ class SetupAction extends _$SetupAction {
     bool silence = false,
     bool force = false,
     Future<void> Function()? preloadInvoke,
+  }) => _applyProfile(
+    force: force,
+    silence: silence,
+    preloadInvoke: preloadInvoke,
+    restartAfterAuthorization: _restartCoreAfterAuthorization,
+  );
+
+  Future<bool> _applyProfile({
+    bool silence = false,
+    bool force = false,
+    Future<void> Function()? preloadInvoke,
+    required Future<bool> Function() restartAfterAuthorization,
   }) async {
     final result = await _runSetup(
       force: force,
       silence: silence,
       preloadInvoke: preloadInvoke,
     );
+    if (result == _SetupTaskResult.handoffToCoreRestart) {
+      return restartAfterAuthorization();
+    }
     return result != _SetupTaskResult.failed;
   }
 
@@ -474,24 +515,49 @@ class SetupAction extends _$SetupAction {
     bool silence = false,
     bool force = false,
     Future<void> Function()? preloadInvoke,
-  }) async {
-    final result = await _setupScheduler.run(() {
-      return _setupConfig(
-        force: force,
-        silence: silence,
-        preloadInvoke: preloadInvoke,
-        onUpdated: () async {
-          await ref.read(proxiesActionProvider.notifier).updateGroups();
-          await ref.read(providersProvider.notifier).syncProviders();
-        },
-      );
-    });
-    if (result != _SetupTaskResult.handoffToCoreRestart) {
-      return result;
+  }) {
+    _requestedSetupRevision++;
+    _setupForce |= force;
+    _setupSilence &= silence;
+    if (preloadInvoke != null) {
+      Future<void>? invoked;
+      _setupPreload = () => invoked ??= preloadInvoke();
     }
-    // Release the current serial task before restartCore reapplies the profile.
-    final restarted = await _restartCoreAfterAuthorization();
-    return restarted ? _SetupTaskResult.completed : _SetupTaskResult.failed;
+    return _setupOperation ??= _drainSetups();
+  }
+
+  Future<_SetupTaskResult> _drainSetups() async {
+    try {
+      return await _setupScheduler.run(() async {
+        while (ref.mounted) {
+          final revision = _requestedSetupRevision;
+          final profileId = ref.read(currentProfileIdProvider);
+          final result = await _setupConfig(
+            force: _setupForce,
+            silence: _setupSilence,
+            preloadInvoke: _setupPreload,
+            isCurrent: () =>
+                ref.mounted &&
+                revision == _requestedSetupRevision &&
+                profileId == ref.read(currentProfileIdProvider),
+            onUpdated: () async {
+              await ref.read(proxiesActionProvider.notifier).updateGroups();
+              await ref.read(providersProvider.notifier).syncProviders();
+            },
+          );
+          if (result != _SetupTaskResult.superseded) {
+            return result;
+          }
+        }
+        return _SetupTaskResult.failed;
+      });
+    } finally {
+      // A restart applies again, so the completed setup must be released first.
+      _setupOperation = null;
+      _setupForce = false;
+      _setupSilence = true;
+      _setupPreload = null;
+    }
   }
 
   Future<bool> _restartCoreAfterAuthorization() async {
@@ -773,6 +839,7 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<_SetupTaskResult> _setupConfig({
+    required bool Function() isCurrent,
     bool force = false,
     bool silence = false,
     Future<void> Function()? preloadInvoke,
@@ -785,15 +852,31 @@ class SetupAction extends _$SetupAction {
         validate: (path, key) => _core.validateProfile(path, key),
       ),
     );
+    if (!isCurrent()) {
+      return _SetupTaskResult.superseded;
+    }
     if (nextProfile != null) {
-      profile = nextProfile;
-      ref.read(profilesProvider.notifier).put(nextProfile);
+      final latest = ref.read(profilesProvider).getProfile(nextProfile.id);
+      if (latest == null ||
+          latest.url != nextProfile.url ||
+          latest.ageSecretKey != nextProfile.ageSecretKey) {
+        return _SetupTaskResult.superseded;
+      }
+      profile = latest.copyWith(
+        label: latest.label.takeFirstValid([nextProfile.label]),
+        subscriptionInfo: nextProfile.subscriptionInfo,
+        lastUpdateDate: nextProfile.lastUpdateDate,
+      );
+      ref.read(profilesProvider.notifier).put(profile);
     }
     commonPrint.log('setup ===> ${profile?.realLabel}');
     final patchConfig = ref.read(patchClashConfigProvider);
     final shouldContinueSetup = await requestAdmin(patchConfig.tun.enable);
     if (!shouldContinueSetup) {
       return _SetupTaskResult.handoffToCoreRestart;
+    }
+    if (!isCurrent()) {
+      return _SetupTaskResult.superseded;
     }
     final pushWatch = Stopwatch()..start();
     final realPatchConfig = _effectivePatchConfig(patchConfig);
@@ -804,6 +887,9 @@ class SetupAction extends _$SetupAction {
       setupState = state;
       return getProfile(setupState: state, patchConfig: realPatchConfig);
     }, title: 'build profile');
+    if (!isCurrent()) {
+      return _SetupTaskResult.superseded;
+    }
     final profileFailed = realProfile == null;
     final setupParams = _setupParams.copyWith(base: realProfile?.base);
     final inputs = switch (setupState) {
@@ -821,7 +907,9 @@ class SetupAction extends _$SetupAction {
       _appliedInputs = inputs;
       globalState.lastConfigCounts = realProfile.counts;
       await preloadInvoke?.call();
-      return _SetupTaskResult.completed;
+      return isCurrent()
+          ? _SetupTaskResult.completed
+          : _SetupTaskResult.superseded;
     }
     // Go answers a config it rejects by running its built-in default, which
     // has no proxies, so until this push succeeds no applied config is known.
@@ -839,8 +927,14 @@ class SetupAction extends _$SetupAction {
     await globalState.loadingRun(
       () async {
         try {
+          if (!isCurrent()) {
+            return;
+          }
           if (setupParams.base == null) {
             final configFilePath = await appPath.configFilePath;
+            if (!isCurrent()) {
+              return;
+            }
             await File(configFilePath).writeAsStringAtomically(yamlString);
           }
           final profileId = profile?.id;
@@ -855,6 +949,9 @@ class SetupAction extends _$SetupAction {
                 logLevel: LogLevel.warning,
               );
             }
+          }
+          if (!isCurrent()) {
+            return;
           }
           try {
             await _core.setupConfig(
@@ -876,6 +973,9 @@ class SetupAction extends _$SetupAction {
           }
           rethrow;
         }
+        if (!isCurrent()) {
+          return;
+        }
         globalState.lastConfigMd5 = yamlMd5;
         globalState.lastConfigCounts =
             realProfile?.counts ?? configCountsOf(const {});
@@ -889,6 +989,9 @@ class SetupAction extends _$SetupAction {
       tag: !silence ? LoadingTag.proxies : null,
     );
     _lastPushDuration = pushWatch.elapsed;
+    if (!isCurrent()) {
+      return _SetupTaskResult.superseded;
+    }
     if (handoffFailure != null) {
       Error.throwWithStackTrace(handoffFailure!.$1, handoffFailure!.$2);
     }

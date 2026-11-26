@@ -757,6 +757,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get ruleProviders => 'Proveedores de reglas';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      'Recursos reutilizables de perfiles personalizados; usa RULE-SET o una política DNS rule-set para aplicarlos. Importarlos no cambia el tráfico.';
+
+  @override
   String get providerUrlTip => 'Solo se admiten proveedores remotos';
 
   @override
@@ -1524,6 +1528,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get script => 'Script';
 
   @override
+  String get advancedScriptsDesc =>
+      'Biblioteca de scripts compartida; un script solo se ejecuta si un perfil lo selecciona.';
+
+  @override
   String get color => 'Color';
 
   @override
@@ -1643,12 +1651,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get addedRules => 'Reglas añadidas';
 
   @override
+  String get advancedAddedRulesDesc =>
+      'Para perfiles URL y archivo, incluso al cambiar de suscripción. Se pueden desactivar por perfil. Los perfiles personalizados usan sus propias reglas.';
+
+  @override
+  String get profileAddedRulesDesc =>
+      'Solo este perfil: después de su script, antes de las reglas globales activadas y las originales del perfil.';
+
+  @override
   String get addedRulesAfterScript =>
       'Se insertan tras ejecutar el script, antes de las reglas del perfil';
 
   @override
   String get controlGlobalAddedRules =>
       'Controlar las reglas añadidas globales';
+
+  @override
+  String get globalAddedRulesDesc =>
+      'Elige las reglas globales solo para este perfil; no cambia las opciones de los demás.';
 
   @override
   String get quickActions => 'Acciones rápidas';
@@ -1678,7 +1698,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get extendScript => 'Script de extensión';
 
   @override
+  String get profileScriptDesc =>
+      'Solo este perfil: se ejecuta al generar su configuración, antes de las reglas añadidas. Los demás perfiles deben seleccionarlo por separado.';
+
+  @override
+  String get profileExtendApplyDesc =>
+      'Los cambios se aplican al salir o al pulsar Aplicar. Un perfil inactivo los usa la próxima vez que se selecciona.';
+
+  @override
   String get goToConfigureScript => 'Ir a la configuración del script';
+
+  @override
+  String get scriptsLibraryDesc =>
+      'Los scripts guardados aquí son definiciones; selecciona uno en un perfil para ejecutarlo.';
 
   @override
   String get goToConfigureAddedRules =>

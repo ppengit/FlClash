@@ -728,6 +728,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get ruleProviders => 'ルールプロバイダー';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      'カスタムプロファイル用の共有リソースです。RULE-SET または DNS の rule-set ポリシーで参照すると有効になり、インポートだけでは通信は変わりません。';
+
+  @override
   String get providerUrlTip => 'リモートリソースのみ対応しています';
 
   @override
@@ -1480,6 +1484,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get script => 'スクリプト';
 
   @override
+  String get advancedScriptsDesc =>
+      '共有スクリプトライブラリです。プロファイルの拡張設定で選択したときだけ実行されます。';
+
+  @override
   String get color => 'カラー';
 
   @override
@@ -1598,10 +1606,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get addedRules => '追加ルール';
 
   @override
+  String get advancedAddedRulesDesc =>
+      'URL・ファイルプロファイルに適用され、サブスクリプションを切り替えても有効です。個別に無効化できます。カスタムプロファイルは自身のルールを使います。';
+
+  @override
+  String get profileAddedRulesDesc =>
+      'このプロファイルのみ。スクリプトの後、有効なグローバルルールとプロファイル自身のルールより前に評価されます。';
+
+  @override
   String get addedRulesAfterScript => 'スクリプトの実行後、プロファイルのルールより前に挿入されます';
 
   @override
   String get controlGlobalAddedRules => 'グローバル追加ルールを管理';
+
+  @override
+  String get globalAddedRulesDesc =>
+      'このプロファイルで使うグローバルルールだけを選びます。他のプロファイルの選択は変わりません。';
 
   @override
   String get quickActions => 'クイック操作';
@@ -1631,7 +1651,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get extendScript => '拡張スクリプト';
 
   @override
+  String get profileScriptDesc =>
+      'このプロファイルの設定生成時に、追加ルールより前に実行されます。他のプロファイルでは別途選択が必要です。';
+
+  @override
+  String get profileExtendApplyDesc =>
+      'このページを閉じるか「今すぐ適用」を選ぶと反映されます。使用していないプロファイルは次の選択時に反映されます。';
+
+  @override
   String get goToConfigureScript => 'スクリプト設定へ移動';
+
+  @override
+  String get scriptsLibraryDesc =>
+      'ここにはスクリプトの定義を保存します。プロファイルの拡張設定で選択したときだけ実行されます。';
 
   @override
   String get goToConfigureAddedRules => '追加ルール設定へ移動';

@@ -28,6 +28,8 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     with CoreEventListener {
   CoreController get _core => ref.read(coreHandlerProvider);
 
+  var _profileSetupPending = false;
+
   @override
   Widget build(BuildContext context) {
     return widget.child;
@@ -42,9 +44,13 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     // the previous one hides the error and looks like the switch was lost.
     ref.listenManual(currentProfileIdProvider, (prev, next) {
       if (prev == next) return;
-      runAfterFrame(() {
-        unawaited(ref.read(setupActionProvider.notifier).fullSetup());
-      });
+      _profileSetupPending = true;
+      _scheduleProfileSetup();
+    });
+    ref.listenManual(initProvider, (_, next) {
+      if (next && _profileSetupPending) {
+        _scheduleProfileSetup();
+      }
     });
     ref.listenManual(updateParamsProvider, (prev, next) {
       if (prev != next) {
@@ -95,6 +101,16 @@ class _CoreContainerState extends ConsumerState<CoreManager>
         _syncLogStream();
       }
     }, fireImmediately: true);
+  }
+
+  void _scheduleProfileSetup() {
+    runAfterFrame(() {
+      if (!mounted || !ref.read(initProvider) || !_profileSetupPending) {
+        return;
+      }
+      _profileSetupPending = false;
+      unawaited(ref.read(setupActionProvider.notifier).fullSetup());
+    });
   }
 
   void _syncLogStream() {

@@ -728,6 +728,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get ruleProviders => '규칙 공급자';
 
   @override
+  String get advancedRuleProvidersDesc =>
+      '사용자 지정 프로필의 재사용 리소스입니다. RULE-SET 또는 DNS rule-set 정책으로 참조해야 적용되며, 가져오기만 해서는 트래픽이 바뀌지 않습니다.';
+
+  @override
   String get providerUrlTip => '원격 공급자만 지원합니다';
 
   @override
@@ -1478,6 +1482,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get script => '스크립트';
 
   @override
+  String get advancedScriptsDesc => '공유 스크립트 라이브러리이며, 프로필에서 선택한 스크립트만 실행됩니다.';
+
+  @override
   String get color => '색상';
 
   @override
@@ -1596,10 +1603,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get addedRules => '추가한 규칙';
 
   @override
+  String get advancedAddedRulesDesc =>
+      'URL 및 파일 프로필에 적용되며 구독을 전환해도 유지됩니다. 프로필별로 끌 수 있습니다. 사용자 지정 프로필은 자체 규칙을 사용합니다.';
+
+  @override
+  String get profileAddedRulesDesc =>
+      '이 프로필에만 적용됩니다. 스크립트 뒤, 활성화된 전역 규칙 및 프로필 자체 규칙 앞에서 평가합니다.';
+
+  @override
   String get addedRulesAfterScript => '스크립트 실행 후 프로필 규칙 앞에 삽입됩니다';
 
   @override
   String get controlGlobalAddedRules => '전역 추가 규칙 관리';
+
+  @override
+  String get globalAddedRulesDesc =>
+      '이 프로필에 적용할 전역 규칙만 선택하며, 다른 프로필의 선택은 바뀌지 않습니다.';
 
   @override
   String get quickActions => '빠른 작업';
@@ -1629,7 +1648,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get extendScript => '확장 스크립트';
 
   @override
+  String get profileScriptDesc =>
+      '이 프로필의 구성을 생성할 때 추가 규칙보다 먼저 실행됩니다. 다른 프로필에서는 별도로 선택해야 합니다.';
+
+  @override
+  String get profileExtendApplyDesc =>
+      '이 페이지를 나가거나 적용을 누르면 반영됩니다. 비활성 프로필은 다음에 선택할 때 반영됩니다.';
+
+  @override
   String get goToConfigureScript => '스크립트 구성으로 이동';
+
+  @override
+  String get scriptsLibraryDesc => '여기에 저장된 스크립트는 정의일 뿐이며, 프로필에서 선택해야 실행됩니다.';
 
   @override
   String get goToConfigureAddedRules => '추가한 규칙 구성으로 이동';
