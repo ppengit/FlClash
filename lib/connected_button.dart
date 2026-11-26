@@ -206,7 +206,7 @@ class ConnectedButtonBar<T> extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const double _inner = 10;
+  static const double _inner = viewSwitcherHeight / 2;
 
   final List<(T, String)> segments;
   final T value;
