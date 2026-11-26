@@ -387,8 +387,11 @@ class SetupAction extends _$SetupAction {
 
   /// For leaving an editor: a profile whose inputs match the config the Core
   /// already runs is not rebuilt, which on a large profile takes a while.
+  /// Comparing the inputs builds a [SetupState], so the pop that carried the
+  /// editor away finishes first.
   void autoApplyProfile() {
     runAfterFrame(() async {
+      await whenNothingAnimates();
       if (!await inputsApplied()) {
         await applyProfile();
       }

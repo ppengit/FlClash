@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
@@ -193,18 +195,51 @@ class _StandardContentState extends ConsumerState<StandardContent> {
   }
 }
 
-class _MatchTargetItem extends ConsumerWidget {
+class _MatchTargetItem extends ConsumerStatefulWidget {
   final int profileId;
 
   const _MatchTargetItem(this.profileId);
 
-  Future<void> _handleSelect(BuildContext context, WidgetRef ref) async {
+  @override
+  ConsumerState<_MatchTargetItem> createState() => _MatchTargetItemState();
+}
+
+class _MatchTargetItemState extends ConsumerState<_MatchTargetItem> {
+  var _settleStarted = false;
+  var _settled = false;
+
+  int get profileId => widget.profileId;
+
+  // The outbounds cost the Core a parse of the whole profile.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_settleStarted) {
+      return;
+    }
+    _settleStarted = true;
+    unawaited(_settle());
+  }
+
+  Future<void> _settle() async {
+    await whenRouteSettled(context);
+    if (!mounted) {
+      return;
+    }
+    await whenNothingAnimates();
+    if (mounted) {
+      setState(() => _settled = true);
+    }
+  }
+
+  Future<void> _handleSelect() async {
     final res = await showSheet<String>(
       context: context,
       builder: (context) => Consumer(
         builder: (_, ref, _) {
           final appLocalizations = context.appLocalizations;
-          final clashConfig = ref.watch(clashConfigProvider(profileId)).value;
+          final configState = ref.watch(clashConfigProvider(profileId));
+          final clashConfig = configState.value;
           final groups = clashConfig?.proxyGroups ?? const [];
           final proxies = clashConfig?.proxies ?? const [];
           final groupTypes = {
@@ -213,6 +248,11 @@ class _MatchTargetItem extends ConsumerWidget {
           final proxyTypes = {for (final item in proxies) item.name: item.type};
           return SelectionSheet<String>(
             title: appLocalizations.matchTarget,
+            loadingStatus: configState.isLoading
+                ? const NullStatus(
+                    illustration: NullStatusIllustration.proxies,
+                  )
+                : null,
             sections: [
               const SelectionSection(items: ['']),
               SelectionSection(
@@ -254,12 +294,15 @@ class _MatchTargetItem extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     final matchTarget = ref.watch(
       profileProvider(profileId).select((state) => state?.matchTarget),
     );
-    final clashConfig = ref.watch(clashConfigProvider(profileId)).value;
+    // No target, nothing to judge as invalid.
+    final clashConfig = _settled && matchTarget != null
+        ? ref.watch(clashConfigProvider(profileId)).value
+        : null;
     final invalid =
         matchTarget != null &&
         clashConfig != null &&
@@ -279,9 +322,7 @@ class _MatchTargetItem extends ConsumerWidget {
                   : context.colorScheme.tertiary,
             ),
       ),
-      onPressed: () {
-        _handleSelect(context, ref);
-      },
+      onPressed: _handleSelect,
     );
   }
 }

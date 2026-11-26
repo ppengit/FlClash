@@ -128,6 +128,27 @@ func TestHandleGetProfileOutboundsListsOnlyNamesAndTypes(t *testing.T) {
 	}
 }
 
+func TestHandleGetProfileOutboundsFollowsAProfileReplacedAtTheSamePath(t *testing.T) {
+	path := writeBaseProfile(t, baseProfile)
+	if _, err := handleGetProfileOutbounds(PathParams{Path: path}); err != nil {
+		t.Fatalf("handleGetProfileOutbounds = %v", err)
+	}
+	replaced := strings.Replace(baseProfile, "name: a}", "name: c}", 1)
+	if err := os.WriteFile(path, []byte(replaced), 0o600); err != nil {
+		t.Fatalf("replace profile: %v", err)
+	}
+
+	outbounds, err := handleGetProfileOutbounds(PathParams{Path: path})
+
+	if err != nil {
+		t.Fatalf("handleGetProfileOutbounds = %v", err)
+	}
+	names := []string{outbounds.Proxies[0].Name, outbounds.Proxies[1].Name}
+	if want := []string{"c", "b"}; !reflect.DeepEqual(names, want) {
+		t.Errorf("proxies = %v, want %v", names, want)
+	}
+}
+
 func TestHandleBuildProfileWritesTheMergedConfigWhereTheHostReadsSpills(t *testing.T) {
 	withSpillHome(t, responseSpillThreshold)
 	path := writeBaseProfile(t, baseProfile)

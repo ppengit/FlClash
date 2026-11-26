@@ -149,9 +149,12 @@ void main() {
       WidgetTester tester, {
       bool current = true,
       bool applied = true,
+      bool settle = true,
+      String? matchTarget,
+      void Function()? onOutboundsRead,
     }) async {
       setViewport(tester);
-      final profile = Profile.normal();
+      final profile = Profile.normal().copyWith(matchTarget: matchTarget);
       final setupAction = _RecordingSetupAction(applied: applied);
       final container = ProviderContainer(
         overrides: [
@@ -164,13 +167,12 @@ void main() {
             (_) => _TestDisabledRuleIds(),
           ),
           scriptsProvider.overrideWith(() => TestScripts(const [])),
-          clashConfigProvider(profile.id).overrideWithValue(
-            const AsyncData(
-              ClashConfig(
-                proxies: [Proxy(name: 'DIRECT', type: 'Direct')],
-              ),
-            ),
-          ),
+          clashConfigProvider(profile.id).overrideWith((_) async {
+            onOutboundsRead?.call();
+            return const ClashConfig(
+              proxies: [Proxy(name: 'DIRECT', type: 'Direct')],
+            );
+          }),
           setupActionProvider.overrideWith(() => setupAction),
         ],
       );
@@ -199,7 +201,9 @@ void main() {
         ),
       );
       await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
+      if (settle) {
+        await tester.pumpAndSettle();
+      }
       return setupAction;
     }
 
@@ -278,6 +282,33 @@ void main() {
 
       expect(applyNowButton(), findsNothing);
       expect(setupAction.applyCalls, 0);
+    });
+
+    testWidgets('reads the profile outbounds only once the page is still', (
+      tester,
+    ) async {
+      var reads = 0;
+      await pumpExtendView(
+        tester,
+        settle: false,
+        matchTarget: 'DIRECT',
+        onOutboundsRead: () => reads++,
+      );
+      await tester.pump();
+      expect(reads, 0);
+
+      await tester.pumpAndSettle();
+      expect(find.byType(ExtendView), findsOneWidget);
+      expect(reads, 1);
+    });
+
+    testWidgets('reads no outbounds without a match target to judge', (
+      tester,
+    ) async {
+      var reads = 0;
+      await pumpExtendView(tester, onOutboundsRead: () => reads++);
+
+      expect(reads, 0);
     });
   });
 

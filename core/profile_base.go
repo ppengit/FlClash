@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/metacubex/mihomo/component/age"
 	"github.com/metacubex/mihomo/config"
@@ -20,6 +21,45 @@ import (
 // What makes a profile large stays in the Core; the overlay the host sends
 // back replaces every other section.
 var profileBaseSections = []string{"proxies", "proxy-groups", "sub-rules"}
+
+// Cached because the host asks again each time it opens the page that offers
+// an outbound as a rule target, and a profile is replaced, not edited in place.
+const outboundsCacheLimit = 2
+
+type outboundsCacheEntry struct {
+	digest    string
+	outbounds *ProfileOutbounds
+}
+
+var (
+	outboundsCacheMu sync.Mutex
+	outboundsCache   = map[string]outboundsCacheEntry{}
+	outboundsOrder   []string
+)
+
+func cachedOutbounds(path, digest string) *ProfileOutbounds {
+	outboundsCacheMu.Lock()
+	defer outboundsCacheMu.Unlock()
+	entry, ok := outboundsCache[path]
+	if !ok || entry.digest != digest {
+		return nil
+	}
+	cached := *entry.outbounds
+	return &cached
+}
+
+func storeOutbounds(path, digest string, outbounds *ProfileOutbounds) {
+	outboundsCacheMu.Lock()
+	defer outboundsCacheMu.Unlock()
+	if _, ok := outboundsCache[path]; !ok {
+		outboundsOrder = append(outboundsOrder, path)
+	}
+	outboundsCache[path] = outboundsCacheEntry{digest: digest, outbounds: outbounds}
+	for len(outboundsOrder) > outboundsCacheLimit {
+		delete(outboundsCache, outboundsOrder[0])
+		outboundsOrder = outboundsOrder[1:]
+	}
+}
 
 func handleGetProfileBase(params PathParams) (*ProfileBase, error) {
 	defer scheduleLoadMemoryRelease()
@@ -50,16 +90,23 @@ func handleGetProfileBase(params PathParams) (*ProfileBase, error) {
 }
 
 func handleGetProfileOutbounds(params PathParams) (*ProfileOutbounds, error) {
-	defer scheduleLoadMemoryRelease()
 	buf, err := os.ReadFile(params.Path)
 	if err != nil {
 		return nil, err
 	}
+	digest := sha256.Sum256(buf)
+	digestHex := hex.EncodeToString(digest[:])
+	if cached := cachedOutbounds(params.Path, digestHex); cached != nil {
+		return cached, nil
+	}
+	defer scheduleLoadMemoryRelease()
 	raw, err := unmarshalRawConfig(buf)
 	if err != nil {
 		return nil, err
 	}
-	return &ProfileOutbounds{Proxies: outboundsOf(raw.Proxy), ProxyGroups: outboundsOf(raw.ProxyGroup)}, nil
+	outbounds := &ProfileOutbounds{Proxies: outboundsOf(raw.Proxy), ProxyGroups: outboundsOf(raw.ProxyGroup)}
+	storeOutbounds(params.Path, digestHex, outbounds)
+	return outbounds, nil
 }
 
 func outboundsOf(mappings []map[string]any) []ProfileOutbound {

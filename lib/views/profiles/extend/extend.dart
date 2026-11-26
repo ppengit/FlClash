@@ -30,18 +30,35 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
   List<Object?>? _applied;
   var _unappliedOnOpen = false;
   var _applying = false;
+  var _checkedOnOpen = false;
 
   @override
   void initState() {
     super.initState();
     _setupAction = ref.read(setupActionProvider.notifier);
-    ref.listenManual(clashConfigProvider(widget.profileId), (_, _) {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_checkedOnOpen) {
+      return;
+    }
+    _checkedOnOpen = true;
     if (ref.read(currentProfileIdProvider) == widget.profileId) {
       unawaited(_checkUnappliedOnOpen());
     }
   }
 
   Future<void> _checkUnappliedOnOpen() async {
+    await whenRouteSettled(context);
+    if (!mounted) {
+      return;
+    }
+    await whenNothingAnimates();
+    if (!mounted) {
+      return;
+    }
     final applied = await _setupAction.inputsApplied();
     if (!applied && mounted) {
       setState(() {
@@ -50,7 +67,7 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
     }
   }
 
-  List<Object?>? _watchInputs() {
+  ({List<Object?>? inputs, bool loaded}) _watchInputs() {
     final profileId = widget.profileId;
     final profile = ref.watch(
       profileProvider(profileId).select(
@@ -58,13 +75,16 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
       ),
     );
     final rules = ref.watch(profileRulesProvider(profileId)).value;
+    if (rules == null) {
+      return (inputs: null, loaded: false);
+    }
     final disabledRuleIds = ref
         .watch(profileDisabledRuleIdsProvider(profileId))
         .value;
-    if (rules == null || disabledRuleIds == null) {
-      return null;
+    if (disabledRuleIds == null) {
+      return (inputs: null, loaded: true);
     }
-    return [profile, rules, disabledRuleIds];
+    return (inputs: [profile, rules, disabledRuleIds], loaded: true);
   }
 
   Future<void> _handleApplyNow(List<Object?> inputs) async {
@@ -95,7 +115,7 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
-    final inputs = _watchInputs();
+    final (:inputs, :loaded) = _watchInputs();
     if (inputs != null) {
       _applied ??= inputs;
     }
@@ -106,7 +126,7 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
         (_unappliedOnOpen ||
             !const DeepCollectionEquality().equals(_applied, inputs));
     return ArrivalHold(
-      ready: inputs != null,
+      ready: loaded,
       child: ProfileIdProvider(
         profileId: widget.profileId,
         child: Scaffold(
