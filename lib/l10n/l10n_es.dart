@@ -1362,6 +1362,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hideTimeoutProxies => 'Ocultar proxies sin respuesta';
 
   @override
+  String get hideErrorProxies => 'Ocultar proxies con errores';
+
+  @override
   String get stackMode => 'Modo de pila';
 
   @override
@@ -1528,6 +1531,23 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get addRule => 'Añadir regla';
+
+  @override
+  String get ruleScope => 'Ámbito de la regla';
+
+  @override
+  String get ruleScopeProfile => 'Este perfil';
+
+  @override
+  String get ruleScopeGlobal => 'Todos los perfiles de URL y archivo';
+
+  @override
+  String get requestRuleSelectProfile =>
+      'Selecciona un perfil antes de añadir una regla desde una solicitud.';
+
+  @override
+  String get requestRuleProfileUnavailable =>
+      'El perfil original ya no está disponible para esta regla. No se ha añadido ninguna regla.';
 
   @override
   String get content => 'Contenido';

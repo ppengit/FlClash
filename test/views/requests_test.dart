@@ -681,6 +681,245 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  group('adding rules from requests', () {
+    const first = Profile(
+      id: 1,
+      type: ProfileType.url,
+      autoUpdateDuration: Duration(hours: 1),
+    );
+    const second = Profile(id: 2, autoUpdateDuration: Duration(hours: 1));
+    late _RequestRuleWrites writes;
+    late _RequestRuleSetup setup;
+
+    setUp(() {
+      container.dispose();
+      writes = _RequestRuleWrites();
+      setup = _RequestRuleSetup();
+      container = ProviderContainer(
+        overrides: [
+          profilesProvider.overrideWith(() => TestProfiles([first, second])),
+          profileRulesProvider.overrideWith2(
+            (_) => _RequestProfileRules(writes),
+          ),
+          globalRulesProvider.overrideWith(() => _RequestGlobalRules(writes)),
+          setupActionProvider.overrideWith(() => setup),
+          customProfileDataProvider.overrideWith(
+            (_, _) => const CustomProfileData(
+              proxyGroups: [
+                ProxyGroup(
+                  id: 3,
+                  name: 'Custom group',
+                  type: GroupType.Selector,
+                  proxies: ['Local proxy'],
+                ),
+              ],
+              proxies: {'Local proxy'},
+              ruleTargets: {'DIRECT', 'Custom group'},
+            ),
+          ),
+        ],
+      );
+      globalState.container = container;
+      container.listen(currentProfileIdProvider, (_, _) {});
+      container.read(currentProfileIdProvider.notifier).value = first.id;
+      container.listen(profileRulesProvider(first.id), (_, _) {});
+      container.listen(profileRulesProvider(second.id), (_, _) {});
+      container.listen(globalRulesProvider, (_, _) {});
+      seedRequests([_tracker(id: 'rule', host: 'rule.test')]);
+    });
+
+    Finder inForm(Finder finder) =>
+        find.descendant(of: find.byType(RuleForm), matching: finder);
+
+    Future<void> openRule(WidgetTester tester) async {
+      await pumpRequests(tester);
+      await openMenu(tester, 'rule.test');
+      await tester.tap(find.text('Add rule'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> saveRule(WidgetTester tester) async {
+      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('defaults to this profile, prefills the host, and requests '
+        'the existing apply owner', (tester) async {
+      await openRule(tester);
+
+      expect(inForm(find.text('Add rule')), findsOneWidget);
+      expect(inForm(find.text('Edit rule')), findsNothing);
+      expect(inForm(find.text('rule.test')), findsOneWidget);
+      expect(inForm(find.text('Rule scope')), findsOneWidget);
+      expect(inForm(find.text('This profile')), findsOneWidget);
+      await saveRule(tester);
+
+      final saved = writes.profiles[first.id]!.single;
+      expect(saved.id, isNot(-1));
+      expect(saved.ruleAction, RuleAction.DOMAIN);
+      expect(saved.content, 'rule.test');
+      expect(saved.ruleTarget, 'DIRECT');
+      expect(writes.global, isEmpty);
+      expect(setup.applies, [(silence: true, force: false)]);
+      await teardownView(tester);
+    });
+
+    testWidgets('global scope writes global rules without another apply '
+        'alongside the existing global-rules watcher', (tester) async {
+      await openRule(tester);
+      await tester.tap(inForm(find.text('Rule scope')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All URL and file profiles').last);
+      await tester.pumpAndSettle();
+      await saveRule(tester);
+
+      expect(writes.global.single.content, 'rule.test');
+      expect(writes.profiles, isEmpty);
+      expect(setup.applies, isEmpty);
+      await teardownView(tester);
+    });
+
+    testWidgets('a file profile supports the same current/global scopes', (
+      tester,
+    ) async {
+      container.read(currentProfileIdProvider.notifier).value = second.id;
+      await openRule(tester);
+      await tester.tap(inForm(find.text('Rule scope')));
+      await tester.pumpAndSettle();
+      expect(find.text('All URL and file profiles'), findsOneWidget);
+      await dismissMenu(tester);
+      await saveRule(tester);
+
+      expect(writes.profiles[second.id]!.single.content, 'rule.test');
+      expect(writes.global, isEmpty);
+      await teardownView(tester);
+    });
+
+    testWidgets('switching profiles keeps the captured destination and '
+        'does not reapply the new profile', (tester) async {
+      await openRule(tester);
+      container.read(currentProfileIdProvider.notifier).value = second.id;
+      await tester.pump();
+      await saveRule(tester);
+
+      expect(writes.profiles[first.id]!.single.content, 'rule.test');
+      expect(writes.profiles[second.id], isNull);
+      expect(writes.global, isEmpty);
+      expect(setup.applies, isEmpty);
+      await teardownView(tester);
+    });
+
+    for (final global in [false, true]) {
+      testWidgets('deleting the original profile does not redirect a '
+          '${global ? 'global' : 'local'} save', (tester) async {
+        await openRule(tester);
+        if (global) {
+          await tester.tap(inForm(find.text('Rule scope')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('All URL and file profiles').last);
+          await tester.pumpAndSettle();
+        }
+        await container.read(profilesProvider.notifier).del(first.id);
+        container.read(currentProfileIdProvider.notifier).value = second.id;
+        await tester.pump();
+        await saveRule(tester);
+
+        expect(writes.profiles, isEmpty);
+        expect(writes.global, isEmpty);
+        expect(setup.applies, isEmpty);
+        expect(tester.takeException(), isNull);
+        await teardownView(tester);
+      });
+    }
+
+    testWidgets('a custom profile has only local scope and real targets, '
+        'never extension-only custom exits', (tester) async {
+      container
+          .read(profilesProvider.notifier)
+          .put(first.copyWith(type: ProfileType.custom));
+      await openRule(tester);
+
+      expect(inForm(find.text('This profile')), findsOneWidget);
+      expect(inForm(find.text('All URL and file profiles')), findsNothing);
+      await tester.tap(
+        inForm(find.text(currentAppLocalizations.splitStrategy)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Custom exit'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Local proxy'),
+        160,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Custom group'), findsOneWidget);
+      expect(find.text('Local proxy'), findsOneWidget);
+      await tester.tap(find.text('Custom group').last);
+      await tester.pumpAndSettle();
+      await saveRule(tester);
+
+      final saved = writes.profiles[first.id]!.single;
+      expect(saved.ruleTarget, 'Custom group');
+      expect(saved.customExit, isFalse);
+      expect(writes.global, isEmpty);
+      expect(setup.applies, [(silence: true, force: false)]);
+      await teardownView(tester);
+    });
+
+    testWidgets('no selected profile opens no unsupported global-rule form', (
+      tester,
+    ) async {
+      container.read(currentProfileIdProvider.notifier).value = null;
+      await openRule(tester);
+
+      expect(find.byType(RuleForm), findsNothing);
+      expect(writes.profiles, isEmpty);
+      expect(writes.global, isEmpty);
+      expect(setup.applies, isEmpty);
+      expect(tester.takeException(), isNull);
+      await teardownView(tester);
+    });
+
+    testWidgets('cancelling or disposing the form never writes a rule', (
+      tester,
+    ) async {
+      await openRule(tester);
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(writes.profiles, isEmpty);
+      expect(writes.global, isEmpty);
+      expect(setup.applies, isEmpty);
+
+      await openMenu(tester, 'rule.test');
+      await tester.tap(find.text('Add rule'));
+      await tester.pumpAndSettle();
+      await teardownView(tester);
+      expect(writes.profiles, isEmpty);
+      expect(writes.global, isEmpty);
+      expect(setup.applies, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a persistence failure rolls back through the existing '
+        'rule notifier without escaping the action', (tester) async {
+      writes.fails = true;
+      await openRule(tester);
+      await saveRule(tester);
+
+      expect(writes.profiles, isEmpty);
+      expect(writes.global, isEmpty);
+      expect(container.read(profileRulesProvider(first.id)).value, isEmpty);
+      expect(tester.takeException(), isNull);
+      await teardownView(tester);
+    });
+  });
+
   testWidgets('a connection\'s menu offers what its state allows, and narrows '
       'the list to its app or hides its host', (tester) async {
     final open = _tracker(id: 'a', host: 'alpha.test');
@@ -2227,6 +2466,58 @@ void main() {
 }
 
 class _MockCore extends Mock implements CoreHandlerInterface {}
+
+class _RequestRuleWrites {
+  final profiles = <int, List<Rule>>{};
+  final global = <Rule>[];
+  bool fails = false;
+}
+
+class _RequestProfileRules extends ProfileRules {
+  final _RequestRuleWrites writes;
+
+  _RequestProfileRules(this.writes);
+
+  @override
+  Stream<List<Rule>> build(int profileId) => Stream.value(const []);
+
+  @override
+  Future<void> persistRule(Rule rule) async {
+    if (writes.fails) {
+      throw StateError('save failed');
+    }
+    (writes.profiles[profileId] ??= []).add(rule);
+  }
+}
+
+class _RequestGlobalRules extends GlobalRules {
+  final _RequestRuleWrites writes;
+
+  _RequestGlobalRules(this.writes);
+
+  @override
+  Stream<List<Rule>> build() => Stream.value(const []);
+
+  @override
+  Future<void> persistRule(Rule rule) async {
+    if (writes.fails) {
+      throw StateError('save failed');
+    }
+    writes.global.add(rule);
+  }
+}
+
+class _RequestRuleSetup extends SetupAction {
+  final applies = <({bool silence, bool force})>[];
+
+  @override
+  void build() {}
+
+  @override
+  void applyProfileDebounce({bool silence = false, bool force = false}) {
+    applies.add((silence: silence, force: force));
+  }
+}
 
 Finder _figure(String text) => find.byWidgetPredicate(
   (widget) =>

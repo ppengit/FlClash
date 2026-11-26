@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 
 import 'form_page.dart';
 import 'form_row.dart';
+import 'selection_sheet.dart';
 
 const _ruleRowVerticalPadding = 7.0;
 
@@ -266,8 +267,18 @@ class RuleForm extends StatefulWidget {
 
   /// The custom exits other added rules already go to.
   final Iterable<String> exits;
+  final Widget? scope;
+  final Map<RuleAction, String> suggestedContents;
+  final Iterable<String>? targets;
 
-  const RuleForm({super.key, this.rule, this.exits = const []});
+  const RuleForm({
+    super.key,
+    this.rule,
+    this.exits = const [],
+    this.scope,
+    this.suggestedContents = const {},
+    this.targets,
+  });
 
   @override
   State<RuleForm> createState() => _RuleFormState();
@@ -277,6 +288,7 @@ class _RuleFormState extends State<RuleForm> {
   late RuleAction _ruleAction;
   late _Target _target;
   late final TextEditingController _contentController;
+  late final Map<RuleAction, String> _contents;
   final _exitController = TextEditingController();
   late bool _noResolve;
   late bool _src;
@@ -286,12 +298,21 @@ class _RuleFormState extends State<RuleForm> {
   void initState() {
     super.initState();
     final rule = widget.rule;
-    _ruleAction = rule?.ruleAction ?? RuleAction.addedRuleActions.first;
+    _contents = Map.of(widget.suggestedContents);
+    _ruleAction =
+        rule?.ruleAction ??
+        _contents.keys.firstOrNull ??
+        RuleAction.addedRuleActions.first;
     _target = (
-      name: rule?.ruleTarget ?? RuleTarget.ruleTargetNames.first,
+      name:
+          rule?.ruleTarget ??
+          widget.targets?.firstOrNull ??
+          RuleTarget.ruleTargetNames.first,
       exit: rule?.customExit ?? false,
     );
-    _contentController = TextEditingController(text: rule?.content);
+    _contentController = TextEditingController(
+      text: rule?.content ?? _contents[_ruleAction],
+    );
     _noResolve = rule?.noResolve ?? false;
     _src = rule?.src ?? false;
   }
@@ -376,6 +397,22 @@ class _RuleFormState extends State<RuleForm> {
     });
   }
 
+  Future<void> _pickTarget(List<_Target> targets) async {
+    final selected = await showNestedSheet<_Target>(
+      context,
+      builder: (context) => SelectionSheet<_Target>(
+        title: context.appLocalizations.splitStrategy,
+        sections: [SelectionSection(items: targets)],
+        labelBuilder: _targetLabel,
+        selectedOf: (_) => _target,
+        onSelected: (target) => Navigator.of(context).pop(target),
+      ),
+    );
+    if (selected != null && mounted) {
+      _handleTarget(selected);
+    }
+  }
+
   Widget _buildSwitchRow({
     required String title,
     required bool value,
@@ -393,16 +430,18 @@ class _RuleFormState extends State<RuleForm> {
     final appLocalizations = context.appLocalizations;
     final issue = _attempted ? _issue() : null;
     final basic = [
-      for (final name in RuleTarget.ruleTargetNames) (name: name, exit: false),
+      for (final name in widget.targets ?? RuleTarget.ruleTargetNames)
+        (name: name, exit: false),
     ];
     final exits = [
-      for (final name in {
-        ...widget.exits,
-        if (_target.exit && _target != _newExit) _target.name,
-      })
-        (name: name, exit: true),
+      if (widget.targets == null)
+        for (final name in {
+          ...widget.exits,
+          if (_target.exit && _target != _newExit) _target.name,
+        })
+          (name: name, exit: true),
     ];
-    final targets = [...basic, ...exits, _newExit];
+    final targets = [...basic, ...exits, if (widget.targets == null) _newExit];
     return FormPage(
       title: widget.rule != null
           ? appLocalizations.editRule
@@ -413,6 +452,7 @@ class _RuleFormState extends State<RuleForm> {
         generateSection(
           title: appLocalizations.basicInfo,
           items: [
+            ?widget.scope,
             ListItem<RuleAction>.options(
               title: Text(appLocalizations.proxyType),
               options: RuleAction.addedRuleActions,
@@ -420,6 +460,11 @@ class _RuleFormState extends State<RuleForm> {
               textBuilder: (action) => action.value,
               onChanged: (action) {
                 setState(() {
+                  if (widget.suggestedContents.isNotEmpty) {
+                    final content = _contentController.text;
+                    _contents[_ruleAction] = content;
+                    _contentController.text = _contents[action] ?? content;
+                  }
                   _ruleAction = action;
                 });
               },
@@ -440,14 +485,25 @@ class _RuleFormState extends State<RuleForm> {
                 onFieldSubmitted: (_) => _handleSubmit(),
               ),
             ),
-            ListItem<_Target>.options(
-              title: Text(appLocalizations.splitStrategy),
-              options: [if (!targets.contains(_target)) _target, ...targets],
-              value: _target,
-              textBuilder: _targetLabel,
-              sectionStarts: {?exits.firstOrNull, _newExit},
-              onChanged: _handleTarget,
-            ),
+            if (widget.targets != null)
+              ListItem(
+                title: Text(appLocalizations.splitStrategy),
+                subtitle: Text(_targetLabel(_target)),
+                trailing: const GlyphIcon(AppGlyphs.chevronForward),
+                onTap: () => _pickTarget([
+                  if (!targets.contains(_target)) _target,
+                  ...targets,
+                ]),
+              )
+            else
+              ListItem<_Target>.options(
+                title: Text(appLocalizations.splitStrategy),
+                options: [if (!targets.contains(_target)) _target, ...targets],
+                value: _target,
+                textBuilder: _targetLabel,
+                sectionStarts: {?exits.firstOrNull, _newExit},
+                onChanged: _handleTarget,
+              ),
             if (_target == _newExit)
               FormRow(
                 title: appLocalizations.name,

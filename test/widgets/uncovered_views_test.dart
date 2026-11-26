@@ -194,53 +194,94 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('the proxies menu sorts by delay and hides timed-out proxies', (
-    tester,
-  ) async {
-    final container = _containerFor(tester);
+  testWidgets(
+    'the proxies menu independently hides timed-out and error proxies',
+    (tester) async {
+      final container = _containerFor(tester);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TestApp(child: ProxiesView()),
-      ),
-    );
-    await tester.pump();
-    final l10n = currentAppLocalizations;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TestApp(child: ProxiesView()),
+        ),
+      );
+      await tester.pump();
+      final l10n = currentAppLocalizations;
 
-    await openProxiesMenu(tester);
-    await tester.tap(inMenu(find.text(l10n.sort)));
-    await tester.pumpAndSettle();
-    await tester.tap(inMenu(find.text(l10n.delay)));
-    await tester.pumpAndSettle();
+      await openProxiesMenu(tester);
+      await tester.tap(inMenu(find.text(l10n.sort)));
+      await tester.pumpAndSettle();
+      await tester.tap(inMenu(find.text(l10n.delay)));
+      await tester.pumpAndSettle();
 
-    expect(
-      container.read(proxiesStyleSettingProvider).sortType,
-      ProxiesSortType.delay,
-    );
+      expect(
+        container.read(proxiesStyleSettingProvider).sortType,
+        ProxiesSortType.delay,
+      );
 
-    await openProxiesMenu(tester);
-    expect(
-      inMenu(
-        find.descendant(
-          of: find.ancestor(
-            of: find.text(l10n.hideTimeoutProxies),
-            matching: find.byType(Row),
+      await openProxiesMenu(tester);
+      expect(
+        inMenu(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text(l10n.hideTimeoutProxies),
+              matching: find.byType(Row),
+            ),
+            matching: find.byGlyph(AppGlyphs.check),
           ),
+        ),
+        findsNothing,
+      );
+      await tester.tap(inMenu(find.text(l10n.hideTimeoutProxies)));
+      await tester.pumpAndSettle();
+
+      expect(
+        container.read(proxiesStyleSettingProvider).hideTimeoutProxies,
+        isTrue,
+      );
+      expect(find.byType(PopupMenu), findsNothing);
+
+      Finder checked(String label) => inMenu(
+        find.descendant(
+          of: find.ancestor(of: find.text(label), matching: find.byType(Row)),
           matching: find.byGlyph(AppGlyphs.check),
         ),
-      ),
-      findsNothing,
-    );
-    await tester.tap(inMenu(find.text(l10n.hideTimeoutProxies)));
-    await tester.pumpAndSettle();
+      );
 
-    expect(
-      container.read(proxiesStyleSettingProvider).hideTimeoutProxies,
-      isTrue,
-    );
-    expect(find.byType(PopupMenu), findsNothing);
-  });
+      await openProxiesMenu(tester);
+      expect(checked(l10n.hideTimeoutProxies), findsOneWidget);
+      expect(checked(l10n.hideErrorProxies), findsNothing);
+      expect(
+        tester.getTopLeft(inMenu(find.text(l10n.hideErrorProxies))).dy,
+        greaterThan(
+          tester.getTopLeft(inMenu(find.text(l10n.hideTimeoutProxies))).dy,
+        ),
+      );
+      await tester.tap(inMenu(find.text(l10n.hideErrorProxies)));
+      await tester.pumpAndSettle();
+
+      expect(
+        container.read(proxiesStyleSettingProvider).hideErrorProxies,
+        isTrue,
+      );
+      expect(
+        container.read(proxiesStyleSettingProvider).hideTimeoutProxies,
+        isTrue,
+      );
+      expect(find.byType(PopupMenu), findsNothing);
+      await openProxiesMenu(tester);
+      expect(checked(l10n.hideTimeoutProxies), findsOneWidget);
+      expect(checked(l10n.hideErrorProxies), findsOneWidget);
+      await tester.tap(inMenu(find.text(l10n.hideTimeoutProxies)));
+      await tester.pumpAndSettle();
+
+      final style = container.read(proxiesStyleSettingProvider);
+      expect(style.hideTimeoutProxies, isFalse);
+      expect(style.hideErrorProxies, isTrue);
+      expect(style.sortType, ProxiesSortType.delay);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('about view renders version and link sections', (tester) async {
     final container = _containerFor(tester);

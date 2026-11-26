@@ -26,6 +26,7 @@ List<PopupMenuItem> trackerInfoMenuItems(
   final close = onClose ?? menuActions?.close;
   final onlyApp = menuActions?.onlyApp;
   final hideHost = menuActions?.hideHost;
+  final addRule = menuActions?.addRule;
   // The row that opened the menu can leave the list before its sheet opens.
   final formHost = Navigator.of(context).overlay!.context;
   return [
@@ -47,6 +48,13 @@ List<PopupMenuItem> trackerInfoMenuItems(
         appLocalizations.copyDestination,
         trackerCopyText(trackerInfo),
         section: const PopupMenuSection(),
+      ),
+    if (addRule != null)
+      PopupMenuItem(
+        glyph: AppGlyphs.add,
+        label: appLocalizations.addRule,
+        section: const PopupMenuSection(),
+        onPressed: () => addRule(trackerInfo),
       ),
     if (onlyApp != null && metadata.process.isNotEmpty)
       PopupMenuItem(

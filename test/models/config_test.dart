@@ -981,12 +981,31 @@ void main() {
       }
     });
 
-    test('round-trip keeps the timed-out node filter', () {
-      final restored = roundTrip(
-        () => const ProxiesStyleProps(hideTimeoutProxies: true).toJson(),
-        ProxiesStyleProps.fromJson,
+    test('missing proxy filters default to visible', () {
+      for (final json in [null, <String, Object?>{}]) {
+        final props = ProxiesStyleProps.fromJson(json);
+        expect(props.hideTimeoutProxies, isFalse);
+        expect(props.hideErrorProxies, isFalse);
+      }
+      expect(
+        ProxiesStyleProps.fromJson({
+          'hideTimeoutProxies': true,
+        }).hideErrorProxies,
+        isFalse,
       );
-      expect(restored.hideTimeoutProxies, true);
+    });
+
+    test('round-trip keeps every combination of proxy filters', () {
+      for (final hideTimeout in [false, true]) {
+        for (final hideError in [false, true]) {
+          final props = ProxiesStyleProps(
+            hideTimeoutProxies: hideTimeout,
+            hideErrorProxies: hideError,
+          );
+          final restored = roundTrip(props.toJson, ProxiesStyleProps.fromJson);
+          expect(restored, props);
+        }
+      }
     });
   });
 

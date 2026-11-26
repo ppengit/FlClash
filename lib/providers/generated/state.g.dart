@@ -2065,21 +2065,21 @@ final class VisibleGroupsStateProvider
 }
 
 String _$visibleGroupsStateHash() =>
-    r'b9f560285e114ebb98625daeb3fe418926e2e9c2';
+    r'3fe00fe5ae3831ff8cabcc143cb17b8780cf8877';
 
-/// Searches before hiding, so a group whose matches all timed out keeps them,
+/// Searches before hiding, so a group whose matches all failed keeps them,
 /// and with them its delay test, instead of dropping out of the results.
 
 @ProviderFor(filterGroupsState)
 final filterGroupsStateProvider = FilterGroupsStateFamily._();
 
-/// Searches before hiding, so a group whose matches all timed out keeps them,
+/// Searches before hiding, so a group whose matches all failed keeps them,
 /// and with them its delay test, instead of dropping out of the results.
 
 final class FilterGroupsStateProvider
     extends $FunctionalProvider<GroupsState, GroupsState, GroupsState>
     with $Provider<GroupsState> {
-  /// Searches before hiding, so a group whose matches all timed out keeps them,
+  /// Searches before hiding, so a group whose matches all failed keeps them,
   /// and with them its delay test, instead of dropping out of the results.
   FilterGroupsStateProvider._({
     required FilterGroupsStateFamily super.from,
@@ -2132,9 +2132,9 @@ final class FilterGroupsStateProvider
   }
 }
 
-String _$filterGroupsStateHash() => r'd27c043b7647ce7f6182f2e5d4a880d987d2d5af';
+String _$filterGroupsStateHash() => r'ab257bc0b773f7d6bf807ada2262a8095849c8bb';
 
-/// Searches before hiding, so a group whose matches all timed out keeps them,
+/// Searches before hiding, so a group whose matches all failed keeps them,
 /// and with them its delay test, instead of dropping out of the results.
 
 final class FilterGroupsStateFamily extends $Family
@@ -2148,7 +2148,7 @@ final class FilterGroupsStateFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Searches before hiding, so a group whose matches all timed out keeps them,
+  /// Searches before hiding, so a group whose matches all failed keeps them,
   /// and with them its delay test, instead of dropping out of the results.
 
   FilterGroupsStateProvider call(String query) =>

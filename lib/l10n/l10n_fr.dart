@@ -1362,6 +1362,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get hideTimeoutProxies => 'Masquer les proxys expirés';
 
   @override
+  String get hideErrorProxies => 'Masquer les proxys en erreur';
+
+  @override
   String get stackMode => 'Mode de pile';
 
   @override
@@ -1528,6 +1531,23 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get addRule => 'Ajouter une règle';
+
+  @override
+  String get ruleScope => 'Portée de la règle';
+
+  @override
+  String get ruleScopeProfile => 'Ce profil';
+
+  @override
+  String get ruleScopeGlobal => 'Tous les profils URL et fichier';
+
+  @override
+  String get requestRuleSelectProfile =>
+      'Sélectionnez un profil avant d’ajouter une règle à partir d’une requête.';
+
+  @override
+  String get requestRuleProfileUnavailable =>
+      'Le profil d’origine n’est plus disponible pour cette règle. Aucune règle n’a été ajoutée.';
 
   @override
   String get content => 'Contenu';

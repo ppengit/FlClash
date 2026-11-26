@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/compute.dart';
+import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
@@ -349,20 +350,24 @@ void main() {
     });
   });
 
-  group('computeHideTimeout', () {
+  group('computeHideProxies', () {
     const defaultTestUrl = 'https://default.test';
 
     List<Group> hide({
       required List<Group> groups,
       required DelayMap delayMap,
       Map<String, String> selectedMap = const {},
+      bool hideTimeoutProxies = true,
+      bool hideErrorProxies = false,
     }) {
-      return computeHideTimeout(
+      return computeHideProxies(
         groups: groups,
         allGroups: groups,
         delayMap: delayMap,
         selectedMap: selectedMap,
         defaultTestUrl: defaultTestUrl,
+        hideTimeoutProxies: hideTimeoutProxies,
+        hideErrorProxies: hideErrorProxies,
       );
     }
 
@@ -387,6 +392,101 @@ void main() {
         'fast',
         'untested',
       ]);
+    });
+
+    for (final (hideTimeout, hideError, hidden) in [
+      (false, false, <String>{}),
+      (true, false, {'timeout'}),
+      (false, true, {'error', 'other error'}),
+      (true, true, {'timeout', 'error', 'other error'}),
+    ]) {
+      test(
+        'filters timeout=$hideTimeout and error=$hideError independently',
+        () {
+          const nodes = [
+            Proxy(name: 'healthy', type: 'ss'),
+            Proxy(name: 'timeout', type: 'ss'),
+            Proxy(name: 'error', type: 'ss'),
+            Proxy(name: 'other error', type: 'ss'),
+            Proxy(name: 'zero', type: 'ss'),
+            Proxy(name: 'untested', type: 'ss'),
+          ];
+          final result = hide(
+            groups: [group.copyWith(all: nodes)],
+            delayMap: {
+              defaultTestUrl: {
+                'healthy': 50,
+                'timeout': delayTimedOutValue,
+                'error': -2,
+                'other error': -3,
+                'zero': 0,
+              },
+            },
+            hideTimeoutProxies: hideTimeout,
+            hideErrorProxies: hideError,
+          );
+
+          expect(
+            result.single.all.map((proxy) => proxy.name),
+            nodes
+                .map((proxy) => proxy.name)
+                .where((name) => !hidden.contains(name)),
+          );
+        },
+      );
+    }
+
+    test(
+      'error filtering preserves selected, nested and unprobeable proxies',
+      () {
+        const nodes = [
+          Proxy(name: 'error', type: 'ss'),
+          Proxy(name: 'selected', type: 'ss'),
+          Proxy(name: 'nested', type: 'Selector'),
+          Proxy(name: 'REJECT', type: 'Reject'),
+        ];
+        final result = hide(
+          groups: [
+            group.copyWith(all: nodes),
+            const Group(
+              name: 'nested',
+              type: GroupType.Selector,
+              now: 'error',
+              all: [Proxy(name: 'error', type: 'ss')],
+            ),
+          ],
+          delayMap: {
+            defaultTestUrl: {'error': -2, 'selected': -2, 'REJECT': -2},
+          },
+          selectedMap: {'sel': 'selected'},
+          hideTimeoutProxies: false,
+          hideErrorProxies: true,
+        );
+
+        expect(result.first.all.map((proxy) => proxy.name), [
+          'selected',
+          'nested',
+          'REJECT',
+        ]);
+        expect(result.last.all.single.name, 'error');
+      },
+    );
+
+    test('error filtering never empties a group', () {
+      const nodes = [
+        Proxy(name: 'error', type: 'ss'),
+        Proxy(name: 'other error', type: 'ss'),
+      ];
+      final result = hide(
+        groups: [group.copyWith(type: GroupType.LoadBalance, all: nodes)],
+        delayMap: {
+          defaultTestUrl: {'error': -2, 'other error': -3},
+        },
+        hideTimeoutProxies: false,
+        hideErrorProxies: true,
+      );
+
+      expect(result.single.all, nodes);
     });
 
     test('keeps a timed-out proxy while it is the selected one', () {

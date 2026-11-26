@@ -51,7 +51,7 @@ List<Group> computeSort({
   }).toList();
 }
 
-/// Built-in adapters whose delay probe always fails, so a timeout says nothing.
+/// Built-in adapters whose delay probe always fails, so failure says nothing.
 const _unprobeableProxyTypes = {
   'Reject',
   'RejectDrop',
@@ -62,12 +62,14 @@ const _unprobeableProxyTypes = {
   'Dns',
 };
 
-List<Group> computeHideTimeout({
+List<Group> computeHideProxies({
   required List<Group> groups,
   required List<Group> allGroups,
   required DelayMap delayMap,
   required Map<String, String> selectedMap,
   required String defaultTestUrl,
+  required bool hideTimeoutProxies,
+  required bool hideErrorProxies,
 }) {
   final realStates = <String, SelectedProxyState>{};
   final proxyTypes = {
@@ -100,7 +102,12 @@ List<Group> computeHideTimeout({
       }
       final testUrl = state.testUrl.takeFirstValid([groupTestUrl]);
       final delay = delayMap[testUrl]?[state.proxyName];
-      return delay == null || delay > 0;
+      if (delay == null || delay >= 0) {
+        return true;
+      }
+      return delay == delayTimedOutValue
+          ? !hideTimeoutProxies
+          : !hideErrorProxies;
     }).toList();
     return group.copyWith(all: visible.isEmpty ? group.all : visible);
   }).toList();

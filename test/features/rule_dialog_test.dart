@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/features/connection/tracker_rule.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -14,6 +15,129 @@ Finder _banner(String text) =>
     find.descendant(of: find.byType(ErrorBanner), matching: find.text(text));
 
 void main() {
+  test(
+    'request rule suggestions use recorded domains, addresses and processes',
+    () {
+      final suggestions = trackerRuleContents(
+        const Metadata(
+          host: ' example.com ',
+          destinationIP: '192.0.2.10',
+          processPath: r'C:\Tools\curl.exe',
+        ),
+      );
+
+      expect(suggestions[RuleAction.DOMAIN], 'example.com');
+      expect(suggestions[RuleAction.DOMAIN_SUFFIX], 'example.com');
+      expect(suggestions[RuleAction.IP_CIDR], '192.0.2.10/32');
+      expect(suggestions[RuleAction.PROCESS_NAME], 'curl.exe');
+      expect(suggestions[RuleAction.PROCESS_PATH], r'C:\Tools\curl.exe');
+      expect(trackerRuleContents(const Metadata(host: '2001:db8::1')), {
+        RuleAction.IP_CIDR6: '2001:db8::1/128',
+      });
+      expect(trackerRuleContents(const Metadata()), isEmpty);
+    },
+  );
+
+  testWidgets('request suggestions follow the type without losing edits', (
+    tester,
+  ) async {
+    Rule? result;
+    await tester.pumpWidget(
+      TestApp(
+        wrapInProviderScope: true,
+        overrides: [
+          viewSizeProvider.overrideWithBuild((_, _) => const Size(1200, 800)),
+        ],
+        child: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () async {
+              result = await showFormSheet<Rule>(
+                context: context,
+                builder: (_) => const RuleForm(
+                  suggestedContents: {
+                    RuleAction.DOMAIN: 'rule.test',
+                    RuleAction.IP_CIDR: '192.0.2.10/32',
+                    RuleAction.PROCESS_NAME: 'curl.exe',
+                  },
+                ),
+              );
+            },
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final l10n = currentAppLocalizations;
+    final content = find.byType(TextFormField);
+    expect(tester.widget<TextFormField>(content).controller!.text, 'rule.test');
+    await tester.enterText(content, 'edited.test');
+
+    Future<void> selectType(RuleAction action) async {
+      await tester.tap(find.text(l10n.proxyType));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(action.value).last);
+      await tester.tap(find.text(action.value).last);
+      await tester.pumpAndSettle();
+    }
+
+    await selectType(RuleAction.IP_CIDR);
+    expect(
+      tester.widget<TextFormField>(content).controller!.text,
+      '192.0.2.10/32',
+    );
+    await selectType(RuleAction.DOMAIN);
+    expect(
+      tester.widget<TextFormField>(content).controller!.text,
+      'edited.test',
+    );
+    await selectType(RuleAction.PROCESS_NAME);
+    expect(tester.widget<TextFormField>(content).controller!.text, 'curl.exe');
+    await tester.tap(find.widgetWithText(TextButton, l10n.save));
+    await tester.pumpAndSettle();
+
+    expect(result!.ruleAction, RuleAction.PROCESS_NAME);
+    expect(result!.content, 'curl.exe');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a large explicit target list builds only its visible choices', (
+    tester,
+  ) async {
+    final targets = [
+      'DIRECT',
+      for (var index = 0; index < 2000; index++) 'Proxy $index',
+    ];
+    await tester.pumpWidget(
+      TestApp(
+        wrapInProviderScope: true,
+        overrides: [
+          viewSizeProvider.overrideWithBuild((_, _) => const Size(1200, 800)),
+        ],
+        child: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showFormSheet<Rule>(
+              context: context,
+              builder: (_) => RuleForm(targets: targets),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(currentAppLocalizations.splitStrategy));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Proxy 1999'), findsNothing);
+    expect(find.textContaining('Proxy ').evaluate().length, lessThan(50));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('add rule validates content and returns the entered rule', (
     tester,
   ) async {

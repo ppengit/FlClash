@@ -14,8 +14,14 @@ class TrackerMenuActions {
   final ValueChanged<TrackerInfo>? close;
   final ValueChanged<TrackerInfo>? onlyApp;
   final ValueChanged<TrackerInfo>? hideHost;
+  final ValueChanged<TrackerInfo>? addRule;
 
-  const TrackerMenuActions({this.close, this.onlyApp, this.hideHost});
+  const TrackerMenuActions({
+    this.close,
+    this.onlyApp,
+    this.hideHost,
+    this.addRule,
+  });
 }
 
 class TrackerMenuScope extends InheritedWidget {

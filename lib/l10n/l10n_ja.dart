@@ -1311,6 +1311,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hideTimeoutProxies => 'タイムアウトしたプロキシを隠す';
 
   @override
+  String get hideErrorProxies => 'エラーのあるプロキシを隠す';
+
+  @override
   String get stackMode => 'スタックモード';
 
   @override
@@ -1471,6 +1474,22 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get addRule => 'ルールを追加';
+
+  @override
+  String get ruleScope => 'ルールの適用範囲';
+
+  @override
+  String get ruleScopeProfile => 'このプロファイル';
+
+  @override
+  String get ruleScopeGlobal => 'すべての URL・ファイルプロファイル';
+
+  @override
+  String get requestRuleSelectProfile => 'リクエストからルールを追加する前に、プロファイルを選択してください。';
+
+  @override
+  String get requestRuleProfileUnavailable =>
+      '元のプロファイルにはこのルールを追加できなくなりました。ルールは追加されていません。';
 
   @override
   String get content => '内容';

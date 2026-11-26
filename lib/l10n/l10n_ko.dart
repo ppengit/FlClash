@@ -1310,6 +1310,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get hideTimeoutProxies => '시간 초과된 프록시 숨기기';
 
   @override
+  String get hideErrorProxies => '오류가 발생한 프록시 숨기기';
+
+  @override
   String get stackMode => '스택 모드';
 
   @override
@@ -1471,6 +1474,22 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get addRule => '규칙 추가';
+
+  @override
+  String get ruleScope => '규칙 적용 범위';
+
+  @override
+  String get ruleScopeProfile => '이 프로필';
+
+  @override
+  String get ruleScopeGlobal => '모든 URL 및 파일 프로필';
+
+  @override
+  String get requestRuleSelectProfile => '요청에서 규칙을 추가하기 전에 프로필을 선택하세요.';
+
+  @override
+  String get requestRuleProfileUnavailable =>
+      '원래 프로필에 더 이상 이 규칙을 추가할 수 없습니다. 규칙이 추가되지 않았습니다.';
 
   @override
   String get content => '내용';

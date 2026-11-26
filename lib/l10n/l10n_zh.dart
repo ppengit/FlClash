@@ -1303,6 +1303,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hideTimeoutProxies => '隐藏超时代理';
 
   @override
+  String get hideErrorProxies => '隐藏错误代理';
+
+  @override
   String get stackMode => '栈模式';
 
   @override
@@ -1463,6 +1466,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get addRule => '添加规则';
+
+  @override
+  String get ruleScope => '规则范围';
+
+  @override
+  String get ruleScopeProfile => '当前配置';
+
+  @override
+  String get ruleScopeGlobal => '所有 URL 和文件配置';
+
+  @override
+  String get requestRuleSelectProfile => '请先选择配置，再从请求记录添加规则。';
+
+  @override
+  String get requestRuleProfileUnavailable => '原配置已无法用于此规则，未添加任何规则。';
 
   @override
   String get content => '内容';

@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/common/app_ports.dart';
 import 'package:fl_clash/common/cidr.dart';
+import 'package:fl_clash/common/compute.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/mitm_network.dart';
 import 'package:fl_clash/common/system.dart';
@@ -164,6 +165,184 @@ void main() {
           .map((proxy) => proxy.name),
       ['fast'],
     );
+  });
+
+  test('error filtering keeps untested and pending nodes in both layouts', () {
+    const testUrl = 'https://default.test';
+    const names = [
+      'healthy',
+      'timeout',
+      'error',
+      'zero',
+      'untested',
+      'queued',
+      'running',
+    ];
+    container.read(groupsProvider.notifier).value = [
+      Group(
+        name: 'Visible',
+        type: GroupType.Selector,
+        hidden: false,
+        all: [for (final name in names) Proxy(name: name, type: 'ss')],
+      ),
+    ];
+    container
+        .read(patchClashConfigProvider.notifier)
+        .update((state) => state.copyWith(mode: Mode.rule, testUrl: testUrl));
+    final delays = container.read(delayDataSourceProvider.notifier);
+    delays.setDelays(const [
+      Delay(url: testUrl, name: 'healthy', value: 50),
+      Delay(url: testUrl, name: 'timeout', value: delayTimedOutValue),
+      Delay(url: testUrl, name: 'error', value: -2),
+      Delay(url: testUrl, name: 'zero', value: 0),
+    ]);
+    container
+        .read(pendingDelayTestsProvider.notifier)
+        .apply(
+          acquired: [
+            delayTestKey(testUrl, 'queued'),
+            delayTestKey(testUrl, 'running'),
+          ],
+          started: [delayTestKey(testUrl, 'running')],
+        );
+    container
+        .read(proxiesStyleSettingProvider.notifier)
+        .update((state) => state.copyWith(hideErrorProxies: true));
+
+    void expectNames(List<String> expected) {
+      expect(
+        container
+            .read(proxiesListStateProvider)
+            .groups
+            .single
+            .all
+            .map((proxy) => proxy.name),
+        expected,
+      );
+      expect(
+        container
+            .read(proxiesTabStateProvider)
+            .groups
+            .single
+            .all
+            .map((proxy) => proxy.name),
+        expected,
+      );
+    }
+
+    expectNames([
+      'healthy',
+      'timeout',
+      'zero',
+      'untested',
+      'queued',
+      'running',
+    ]);
+    expect(
+      container
+          .read(filterGroupsStateProvider('error'))
+          .value
+          .single
+          .all
+          .single
+          .name,
+      'error',
+    );
+    container
+        .read(proxiesStyleSettingProvider.notifier)
+        .update((state) => state.copyWith(hideTimeoutProxies: true));
+    expectNames(['healthy', 'zero', 'untested', 'queued', 'running']);
+
+    delays.setDelay(const Delay(url: testUrl, name: 'error', value: 80));
+    expectNames(['healthy', 'zero', 'untested', 'queued', 'running']);
+    container.read(sortNumProvider.notifier).add();
+    expectNames(['healthy', 'error', 'zero', 'untested', 'queued', 'running']);
+    container.read(delayDataSourceProvider.notifier).value = {};
+    expectNames(names);
+  });
+
+  test('global filters apply after switching and refreshing subscriptions', () {
+    const testUrl = 'https://default.test';
+    const style = ProxiesStyleProps(
+      type: ProxiesType.tab,
+      sortType: ProxiesSortType.name,
+      layout: ProxiesLayout.loose,
+      iconStyle: ProxiesIconStyle.hidden,
+      cardType: ProxyCardType.compact,
+      hideTimeoutProxies: true,
+      hideErrorProxies: true,
+    );
+    const file = Profile(
+      id: 1,
+      autoUpdateDuration: Duration(),
+      selectedMap: {'File': 'error'},
+    );
+    const subscription = Profile(
+      id: 2,
+      type: ProfileType.url,
+      url: 'https://subscription.test/profile',
+      autoUpdateDuration: Duration(),
+      selectedMap: {'Subscription': 'timeout'},
+    );
+    final profiles = container.read(profilesProvider.notifier);
+    profiles.put(file);
+    profiles.put(subscription);
+    container.listen(configProvider, (_, _) {});
+    container.read(proxiesStyleSettingProvider.notifier).value = style;
+    container
+        .read(patchClashConfigProvider.notifier)
+        .update((state) => state.copyWith(mode: Mode.rule, testUrl: testUrl));
+    container.read(delayDataSourceProvider.notifier).setDelays(const [
+      Delay(url: testUrl, name: 'healthy', value: 50),
+      Delay(url: testUrl, name: 'error', value: -2),
+      Delay(url: testUrl, name: 'timeout', value: delayTimedOutValue),
+      Delay(url: testUrl, name: 'new error', value: -3),
+    ]);
+
+    void show(Profile profile, String groupName, List<String> expected) {
+      container.read(currentProfileIdProvider.notifier).value = profile.id;
+      container.read(groupsProvider.notifier).value = [
+        Group(
+          name: groupName,
+          type: GroupType.Selector,
+          hidden: false,
+          all: const [
+            Proxy(name: 'healthy', type: 'ss'),
+            Proxy(name: 'error', type: 'ss'),
+            Proxy(name: 'timeout', type: 'ss'),
+            Proxy(name: 'new error', type: 'ss'),
+          ],
+        ),
+      ];
+      expect(container.read(currentProfileProvider)?.id, profile.id);
+      expect(container.read(proxiesStyleSettingProvider), style);
+      expect(
+        container
+            .read(proxiesListStateProvider)
+            .groups
+            .single
+            .all
+            .map((proxy) => proxy.name),
+        expected,
+      );
+      expect(
+        container
+            .read(proxiesTabStateProvider)
+            .groups
+            .single
+            .all
+            .map((proxy) => proxy.name),
+        expected,
+      );
+    }
+
+    show(file, 'File', ['healthy', 'error']);
+    show(subscription, 'Subscription', ['healthy', 'timeout']);
+    profiles.put(
+      subscription.copyWith(lastUpdateDate: DateTime.utc(2026, 11, 26)),
+    );
+    show(subscription, 'Subscription', ['healthy', 'timeout']);
+    show(file, 'File', ['healthy', 'error']);
   });
 
   test('hidden timed-out nodes follow test batches and cleared delays', () {

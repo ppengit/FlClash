@@ -74,28 +74,32 @@ DelayMap delaysAtLastTestBatch(Ref ref) {
 
 @riverpod
 GroupsState visibleGroupsState(Ref ref) {
-  return _hideTimeoutProxies(ref, ref.watch(currentGroupsStateProvider));
+  return _hideProxies(ref, ref.watch(currentGroupsStateProvider));
 }
 
-GroupsState _hideTimeoutProxies(Ref ref, GroupsState groups) {
-  final hideTimeoutProxies = ref.watch(
-    proxiesStyleSettingProvider.select((state) => state.hideTimeoutProxies),
+GroupsState _hideProxies(Ref ref, GroupsState groups) {
+  final (hideTimeoutProxies, hideErrorProxies) = ref.watch(
+    proxiesStyleSettingProvider.select(
+      (state) => (state.hideTimeoutProxies, state.hideErrorProxies),
+    ),
   );
-  if (!hideTimeoutProxies) {
+  if (!hideTimeoutProxies && !hideErrorProxies) {
     return groups;
   }
   return groups.copyWith(
-    value: computeHideTimeout(
+    value: computeHideProxies(
       groups: groups.value,
       allGroups: ref.watch(groupsProvider),
       delayMap: ref.watch(delaysAtLastTestBatchProvider),
       selectedMap: ref.watch(selectedMapProvider),
       defaultTestUrl: ref.watch(realTestUrlProvider()),
+      hideTimeoutProxies: hideTimeoutProxies,
+      hideErrorProxies: hideErrorProxies,
     ),
   );
 }
 
-/// Searches before hiding, so a group whose matches all timed out keeps them,
+/// Searches before hiding, so a group whose matches all failed keeps them,
 /// and with them its delay test, instead of dropping out of the results.
 @riverpod
 GroupsState filterGroupsState(Ref ref, String query) {
@@ -118,7 +122,7 @@ GroupsState filterGroupsState(Ref ref, String query) {
       })
       .where((group) => group.all.isNotEmpty)
       .toList();
-  return _hideTimeoutProxies(ref, currentGroups.copyWith(value: groups));
+  return _hideProxies(ref, currentGroups.copyWith(value: groups));
 }
 
 @riverpod

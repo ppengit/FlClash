@@ -110,6 +110,14 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
               state.copyWith(hideTimeoutProxies: !state.hideTimeoutProxies),
         ),
       ),
+      PopupMenuItem(
+        glyph: AppGlyphs.eyeOff,
+        label: appLocalizations.hideErrorProxies,
+        checked: style.hideErrorProxies,
+        onPressed: () => _updateStyle(
+          (state) => state.copyWith(hideErrorProxies: !state.hideErrorProxies),
+        ),
+      ),
     ];
   }
 

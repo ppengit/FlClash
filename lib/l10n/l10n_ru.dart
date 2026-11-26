@@ -1348,6 +1348,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get hideTimeoutProxies => 'Скрывать прокси с таймаутом';
 
   @override
+  String get hideErrorProxies => 'Скрывать прокси с ошибками';
+
+  @override
   String get stackMode => 'Режим стека';
 
   @override
@@ -1510,6 +1513,23 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get addRule => 'Добавить правило';
+
+  @override
+  String get ruleScope => 'Область действия правила';
+
+  @override
+  String get ruleScopeProfile => 'Этот профиль';
+
+  @override
+  String get ruleScopeGlobal => 'Все профили из URL и файлов';
+
+  @override
+  String get requestRuleSelectProfile =>
+      'Выберите профиль, прежде чем добавлять правило из запроса.';
+
+  @override
+  String get requestRuleProfileUnavailable =>
+      'Исходный профиль больше недоступен для этого правила. Правило не добавлено.';
 
   @override
   String get content => 'Содержимое';

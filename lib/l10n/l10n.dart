@@ -2616,6 +2616,12 @@ abstract class AppLocalizations {
   /// **'Hide timed-out proxies'**
   String get hideTimeoutProxies;
 
+  /// No description provided for @hideErrorProxies.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide error proxies'**
+  String get hideErrorProxies;
+
   /// No description provided for @stackMode.
   ///
   /// In en, this message translates to:
@@ -2933,6 +2939,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add rule'**
   String get addRule;
+
+  /// No description provided for @ruleScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule scope'**
+  String get ruleScope;
+
+  /// No description provided for @ruleScopeProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'This profile'**
+  String get ruleScopeProfile;
+
+  /// No description provided for @ruleScopeGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'All URL and file profiles'**
+  String get ruleScopeGlobal;
+
+  /// No description provided for @requestRuleSelectProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a profile before adding a rule from a request.'**
+  String get requestRuleSelectProfile;
+
+  /// No description provided for @requestRuleProfileUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The original profile is no longer available for this rule. No rule was added.'**
+  String get requestRuleProfileUnavailable;
 
   /// No description provided for @content.
   ///

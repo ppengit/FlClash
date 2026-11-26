@@ -5,7 +5,11 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
+import '../helpers/preferences.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ProviderContainer container;
 
   setUp(() {
@@ -168,7 +172,49 @@ void main() {
     test('default values', () {
       final value = container.read(proxiesStyleSettingProvider);
       expect(value.type, ProxiesType.list);
+      expect(value.hideTimeoutProxies, isFalse);
+      expect(value.hideErrorProxies, isFalse);
     });
+
+    test(
+      'display and filter options persist globally across profile switches',
+      () async {
+        await mockPreferences();
+        container.listen(configProvider, (_, _) {});
+        const style = ProxiesStyleProps(
+          type: ProxiesType.tab,
+          sortType: ProxiesSortType.name,
+          layout: ProxiesLayout.loose,
+          iconStyle: ProxiesIconStyle.hidden,
+          cardType: ProxyCardType.compact,
+          hideTimeoutProxies: true,
+          hideErrorProxies: true,
+        );
+        container.read(proxiesStyleSettingProvider.notifier).value = style;
+        for (final profileId in [11, 22, null, 11]) {
+          container.read(currentProfileIdProvider.notifier).value = profileId;
+          expect(container.read(proxiesStyleSettingProvider), style);
+          expect(container.read(configProvider).proxiesStyleProps, style);
+        }
+
+        expect(
+          await preferences.saveConfig(container.read(configProvider)),
+          isTrue,
+        );
+        final restored = await preferences.getConfig();
+        expect(restored?.proxiesStyleProps, style);
+        final reloaded = ProviderContainer(
+          overrides: buildConfigOverrides(restored!),
+        );
+        addTearDown(reloaded.dispose);
+        reloaded.listen(configProvider, (_, _) {});
+        for (final profileId in [22, null, 11]) {
+          reloaded.read(currentProfileIdProvider.notifier).value = profileId;
+          expect(reloaded.read(proxiesStyleSettingProvider), style);
+          expect(reloaded.read(configProvider).proxiesStyleProps, style);
+        }
+      },
+    );
 
     test('can update state', () {
       container

@@ -1347,6 +1347,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hideTimeoutProxies => 'Hide timed-out proxies';
 
   @override
+  String get hideErrorProxies => 'Hide error proxies';
+
+  @override
   String get stackMode => 'Stack mode';
 
   @override
@@ -1510,6 +1513,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addRule => 'Add rule';
+
+  @override
+  String get ruleScope => 'Rule scope';
+
+  @override
+  String get ruleScopeProfile => 'This profile';
+
+  @override
+  String get ruleScopeGlobal => 'All URL and file profiles';
+
+  @override
+  String get requestRuleSelectProfile =>
+      'Select a profile before adding a rule from a request.';
+
+  @override
+  String get requestRuleProfileUnavailable =>
+      'The original profile is no longer available for this rule. No rule was added.';
 
   @override
   String get content => 'Content';

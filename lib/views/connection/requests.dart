@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/features/connection/tracker_rule.dart';
 import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -79,6 +80,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     close: _closeConnection,
     onlyApp: _onlyApp,
     hideHost: _hideHost,
+    addRule: (trackerInfo) => showTrackerRuleForm(context, ref, trackerInfo),
   );
   final _poller = ConnectionPoller();
 
