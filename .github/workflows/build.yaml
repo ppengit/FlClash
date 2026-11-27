@@ -97,18 +97,18 @@ jobs:
           path: build/request-previews/*.png
           if-no-files-found: error
 
-      - name: Run tests
-        run: dart run tool/test.dart -- --reporter expanded --coverage
-
-      - name: Check coverage
-        run: dart run tool/check_coverage.dart coverage/lcov.info 75
-
       - name: Check request controls with HTTP capture enabled
         if: github.repository == 'ppengit/FlClash'
         run: |
           trap "perl -pi -e 's/^const rsFeature = true;/const rsFeature = false;/' lib/common/constant.dart" EXIT
           perl -pi -e 's/^const rsFeature = false;/const rsFeature = true;/' lib/common/constant.dart
           flutter test --no-pub test/views/requests_http_test.dart test/views/requests_test.dart --reporter expanded
+
+      - name: Run tests
+        run: dart run tool/test.dart -- --reporter expanded --coverage
+
+      - name: Check coverage
+        run: dart run tool/check_coverage.dart coverage/lcov.info 75
 
   plugins:
     name: Plugins

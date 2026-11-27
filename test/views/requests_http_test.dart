@@ -400,6 +400,7 @@ void main() {
         container.read(viewSizeProvider.notifier).update((_) => size);
         tester.view.physicalSize = size;
         await pumpDetails(tester);
+        await tester.pumpAndSettle();
       }
 
       tester.view.devicePixelRatio = 1;
