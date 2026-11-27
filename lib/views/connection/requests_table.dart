@@ -386,8 +386,6 @@ class _RequestsTableState extends ConsumerState<RequestsTable>
           MediaQuery.textScalerOf(context).scale(style.fontSize!) *
               (style.height ?? 1),
     );
-    const shape = AppShape.sm;
-    final fill = context.raisedSurfaceLevel.colorOf(context.colorScheme);
     return Padding(
       padding: context.listInsets.page(top: context.contentTopPadding),
       child: Column(
@@ -396,16 +394,39 @@ class _RequestsTableState extends ConsumerState<RequestsTable>
           Row(
             spacing: 8,
             children: [
-              Chip(
-                label: l10n.groupByProcess,
-                selected: prefs.grouped,
-                onPressed: () => ref
-                    .read(appSettingProvider.notifier)
-                    .update(
-                      (state) => state.copyWith(
-                        requestsGroupByProcess: !state.requestsGroupByProcess,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 6,
+                children: [
+                  Checkbox(
+                    value: prefs.grouped,
+                    onChanged: (value) => ref
+                        .read(appSettingProvider.notifier)
+                        .update(
+                          (state) => state.copyWith(
+                            requestsGroupByProcess: value ?? false,
+                          ),
+                        ),
+                  ),
+                  PressRegion(
+                    shape: AppShape.none,
+                    onTap: () => ref
+                        .read(appSettingProvider.notifier)
+                        .update(
+                          (state) => state.copyWith(
+                            requestsGroupByProcess:
+                                !state.requestsGroupByProcess,
+                          ),
+                        ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        l10n.groupByProcess,
+                        style: AppTextStyle.footnote.of(context),
                       ),
                     ),
+                  ),
+                ],
               ),
               Expanded(
                 child: ListenableBuilder(
@@ -504,51 +525,37 @@ class _RequestsTableState extends ConsumerState<RequestsTable>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Surface.transparent(
-                            shape: shape,
-                            clipBehavior: Clip.antiAlias,
-                            child: DecoratedBox(
-                              decoration: ShapeDecoration(
-                                color: fill,
-                                shape: shape,
-                              ),
-                              child: TableColumnResizer(
-                                columns: columns,
-                                widths: widths,
-                                onResize: (boundary, delta) => resizeColumn(
-                                  columns,
-                                  widths,
-                                  boundary,
-                                  delta,
-                                ),
-                                onResizeEnd: saveColumnWidths,
-                                onReset: resetColumnWidths,
-                                child: TableCells(
-                                  columns: columns,
-                                  widths: widths,
-                                  height: rowHeight,
-                                  inset: 0,
-                                  cells: [
-                                    for (final column in columns)
-                                      RecordHeaderCell(
-                                        label: column.label,
-                                        end: column.end,
-                                        style: AppTextStyle.footnote.of(
-                                          context,
-                                          emphasized: true,
-                                        ),
-                                        inset: 10,
-                                        descending:
-                                            prefs.sortColumn == column.id
-                                            ? prefs.descending
-                                            : null,
-                                        onTap: () => _sort(column),
-                                      ),
-                                  ],
-                                ),
-                              ),
+                          TableColumnResizer(
+                            columns: columns,
+                            widths: widths,
+                            onResize: (boundary, delta) =>
+                                resizeColumn(columns, widths, boundary, delta),
+                            onResizeEnd: saveColumnWidths,
+                            onReset: resetColumnWidths,
+                            child: TableCells(
+                              columns: columns,
+                              widths: widths,
+                              height: rowHeight,
+                              inset: 0,
+                              cells: [
+                                for (final column in columns)
+                                  RecordHeaderCell(
+                                    label: column.label,
+                                    end: column.end,
+                                    style: AppTextStyle.footnote.of(
+                                      context,
+                                      emphasized: true,
+                                    ),
+                                    inset: 10,
+                                    descending: prefs.sortColumn == column.id
+                                        ? prefs.descending
+                                        : null,
+                                    onTap: () => _sort(column),
+                                  ),
+                              ],
                             ),
                           ),
+                          const Divider(height: 1),
                           Expanded(
                             child: _tree.error != null
                                 ? NullStatus(
@@ -687,9 +694,9 @@ class RequestsTableRow extends StatelessWidget {
           builder: (context) {
             final row = PressSurface(
               fill: striped
-                  ? context.raisedSurfaceLevel.colorOf(context.colorScheme)
+                  ? SurfaceLevel.inset.colorOf(context.colorScheme)
                   : Colors.transparent,
-              shape: AppShape.sm,
+              shape: AppShape.none,
               selected: selected,
               onPressed: () => openTrackerInfo(
                 context,
@@ -785,7 +792,7 @@ class RequestsProcessRow extends StatelessWidget {
     expanded: expanded,
     child: PressSurface(
       fill: context.raisedSurfaceLevel.colorOf(context.colorScheme),
-      shape: AppShape.sm,
+      shape: AppShape.none,
       onPressed: onPressed,
       child: DefaultTextStyle.merge(
         maxLines: 1,

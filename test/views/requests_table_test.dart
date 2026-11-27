@@ -220,7 +220,8 @@ void main() {
   ) async {
     seed([_request('1', 'Editor.exe'), _request('2', 'Browser.exe')]);
     await pump(tester);
-    await tester.tap(find.widgetWithText(Chip, 'Group by process'));
+    expect(find.byType(Checkbox), findsOneWidget);
+    await tester.tap(find.text('Group by process'));
     await tester.pumpAndSettle();
     expect(find.byType(RequestsProcessRow), findsNothing);
     expect(ids(tester), ['2', '1']);
