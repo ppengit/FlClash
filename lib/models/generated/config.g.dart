@@ -67,6 +67,7 @@ _AppSettingProps _$AppSettingPropsFromJson(
       defaultFilters,
   hideIp: json['hideIp'] as bool? ?? false,
   requestsSplitView: json['requestsSplitView'] as bool? ?? true,
+  requestsListWidth: (json['requestsListWidth'] as num?)?.toDouble() ?? 392,
   requestsGroupByProcess: json['requestsGroupByProcess'] as bool? ?? true,
   requestsColumns:
       (json['requestsColumns'] as List<dynamic>?)
@@ -142,6 +143,7 @@ Map<String, dynamic> _$AppSettingPropsToJson(_AppSettingProps instance) =>
       'filters': instance.filters,
       'hideIp': instance.hideIp,
       'requestsSplitView': instance.requestsSplitView,
+      'requestsListWidth': instance.requestsListWidth,
       'requestsGroupByProcess': instance.requestsGroupByProcess,
       'requestsColumns': instance.requestsColumns,
       'requestsSortColumn': instance.requestsSortColumn,

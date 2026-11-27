@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/features/connection/connection_connected_buttons.dart';
 import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/mitm.dart';
@@ -150,19 +151,27 @@ void main() {
     );
     await tester.pump();
     if (rsFeature && open) {
+      await tester.ensureVisible(find.text('HTTP'));
       await tester.tap(find.text('HTTP'));
     }
     await tester.pumpAndSettle();
   }
 
-  Future<void> openMenu(WidgetTester tester) async {
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byGlyph(AppGlyphs.more),
-      ),
+  Future<void> pumpDetails(WidgetTester tester) async {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+  }
+
+  Future<void> tapAction(WidgetTester tester, String label) async {
+    final button = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byTooltip(label),
     );
-    await tester.pumpAndSettle();
+    expect(button, findsOneWidget);
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await pumpDetails(tester);
   }
 
   void decrypt({required bool on}) => container
@@ -303,6 +312,7 @@ void main() {
         );
         capture();
         await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('HTTP'));
         await tester.tap(find.text('HTTP'));
         await tester.pump(const Duration(seconds: 2));
         await tester.pumpAndSettle();
@@ -351,7 +361,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
 
       final tabs = find.descendant(
         of: find.byType(DetailSheet),
@@ -389,7 +399,7 @@ void main() {
       Future<void> resize(Size size) async {
         container.read(viewSizeProvider.notifier).update((_) => size);
         tester.view.physicalSize = size;
-        await tester.pumpAndSettle();
+        await pumpDetails(tester);
       }
 
       tester.view.devicePixelRatio = 1;
@@ -411,7 +421,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
       expect(find.byType(MitmExchangeView), findsOneWidget);
       expect(find.byType(DetailSheet), findsNothing);
 
@@ -466,7 +476,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
       expect(find.byType(MitmExchangeView), findsOneWidget);
 
       capture(on: false);
@@ -523,7 +533,18 @@ void main() {
       capture();
       await pumpHttp(tester);
 
-      expect(shownStatusText(tester), 'All 4');
+      expect(selectedStatusText(tester), 'All(4)');
+      expect(
+        find.byType(
+          ConditionStatusButtons<MitmExchangeSummary, HttpRequestStatus>,
+        ),
+        findsOneWidget,
+      );
+      expect(statusButtonLabels(tester), [
+        'All(4)',
+        'Failed(2)',
+        'Rewritten(1)',
+      ]);
       await pickStatus(tester, 'Failed 2');
       expect(find.byType(HttpRequestRow), findsNWidgets(2));
       expect(find.text('/ok'), findsNothing);
@@ -611,7 +632,7 @@ void main() {
 
       expect(find.text('Select a request'), findsOneWidget);
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
 
       final view = find.byType(MitmExchangeView);
       expect(view, findsOneWidget);
@@ -644,7 +665,7 @@ void main() {
         query: ({before, since, required limit}) async => page,
       );
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
       expect(find.byType(MitmExchangeView), findsOneWidget);
 
       page = const MitmQueryPage(capturing: true, version: 0);
@@ -671,7 +692,7 @@ void main() {
         query: ({before, since, required limit}) async => page,
       );
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
       expect(find.byType(MitmExchangeView), findsOneWidget);
 
       page = MitmQueryPage(
@@ -707,7 +728,7 @@ void main() {
       await pumpHttp(tester, size: _phoneSize);
 
       await tester.tap(find.text('/ok'));
-      await tester.pumpAndSettle();
+      await pumpDetails(tester);
 
       expect(find.byType(DetailSheet), findsOneWidget);
       expect(find.byType(MitmExchangeView), findsOneWidget);
@@ -715,19 +736,44 @@ void main() {
       await teardownView(tester);
     });
 
-    testWidgets('the menu turns capture on, which brings the HTTP segment, '
-        'and off, which leaves it for connections', (tester) async {
+    testWidgets('the direct capture buttons bring the HTTP segment on and '
+        'leave it for connections when turned off', (tester) async {
       setUpContainer();
       capture(on: false);
       await pumpHttp(tester, open: false);
 
       expect(find.text('HTTP'), findsNothing);
+      final controls = find.ancestor(
+        of: find.byTooltip(currentAppLocalizations.turnOn),
+        matching: find.byType(ConnectedFilterButtons<bool>),
+      );
+      expect(controls, findsOneWidget);
+      expect(
+        find.descendant(of: controls, matching: find.byGlyph(AppGlyphs.camera)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: controls, matching: find.byGlyph(AppGlyphs.block)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: controls, matching: find.byType(Text)),
+        findsNothing,
+      );
+      expect(find.byGlyph(AppGlyphs.more), findsNothing);
+      expect(find.byType(PopupMenu), findsNothing);
+      expect(
+        tester.widget<ConnectedFilterButtons<bool>>(controls).isSelected(false),
+        isTrue,
+      );
 
-      await openMenu(tester);
-      await tester.tap(find.text(currentAppLocalizations.turnOn));
-      await tester.pumpAndSettle();
-
+      await tapAction(tester, currentAppLocalizations.turnOn);
       expect(container.read(patchClashConfigProvider).mitm.capture, isTrue);
+      expect(
+        tester.widget<ConnectedFilterButtons<bool>>(controls).isSelected(true),
+        isTrue,
+      );
+      await tester.ensureVisible(find.text('HTTP'));
       await tester.tap(find.text('HTTP'));
       await tester.pumpAndSettle();
       expect(find.byType(HttpRequestList), findsOneWidget);
@@ -736,29 +782,31 @@ void main() {
         findsOneWidget,
       );
 
-      await openMenu(tester);
-      await tester.tap(find.text(currentAppLocalizations.turnOff));
-      await tester.pumpAndSettle();
-
+      await tapAction(tester, currentAppLocalizations.turnOff);
       expect(container.read(patchClashConfigProvider).mitm.capture, isFalse);
       expect(find.text('HTTP'), findsNothing);
       expect(find.byType(HttpRequestList), findsNothing);
       expect(noConnections(), findsOneWidget);
+      expect(find.byType(PopupMenu), findsNothing);
 
       await teardownView(tester);
     });
 
-    testWidgets('the menu keeps how many records capture holds', (
-      tester,
-    ) async {
+    testWidgets('the dedicated capture-limit popup keeps how many records '
+        'capture holds', (tester) async {
       setUpContainer();
       capture();
       await pumpHttp(tester, open: false);
 
-      await openMenu(tester);
-      expect(find.text(currentAppLocalizations.httpCapture), findsOneWidget);
-      await tester.tap(find.text(currentAppLocalizations.httpCaptureLimit));
-      await tester.pumpAndSettle();
+      final limit = find.byTooltip(currentAppLocalizations.httpCaptureLimit);
+      expect(
+        find.ancestor(of: limit, matching: find.byType(PopupAnchor)),
+        findsOneWidget,
+      );
+      expect(find.byGlyph(AppGlyphs.more), findsNothing);
+      await tapAction(tester, currentAppLocalizations.httpCaptureLimit);
+      expect(find.byType(PopupMenu), findsOneWidget);
+      expect(find.text(currentAppLocalizations.httpCapture), findsNothing);
       await tester.tap(find.text('5000'));
       await tester.pumpAndSettle();
 
@@ -770,20 +818,26 @@ void main() {
       await teardownView(tester);
     });
 
-    testWidgets('without decryption the menu has no capture section', (
+    testWidgets('without decryption there are no direct capture controls', (
       tester,
     ) async {
       setUpContainer();
       await pumpHttp(tester, open: false);
 
-      await openMenu(tester);
-
-      expect(find.text(currentAppLocalizations.httpCapture), findsNothing);
+      expect(find.byTooltip(currentAppLocalizations.turnOn), findsNothing);
+      expect(find.byTooltip(currentAppLocalizations.turnOff), findsNothing);
       expect(
-        find.text(currentAppLocalizations.closeActiveConnections),
+        find.byTooltip(currentAppLocalizations.httpCaptureLimit),
+        findsNothing,
+      );
+      expect(
+        find.byTooltip(currentAppLocalizations.closeActiveConnections),
         findsOneWidget,
       );
-      expect(find.byGlyph(AppGlyphs.block), findsNothing);
+      expect(find.byGlyph(AppGlyphs.camera), findsNothing);
+      expect(find.byGlyph(AppGlyphs.memory), findsNothing);
+      expect(find.byGlyph(AppGlyphs.more), findsNothing);
+      expect(find.byType(PopupMenu), findsNothing);
 
       await teardownView(tester);
     });

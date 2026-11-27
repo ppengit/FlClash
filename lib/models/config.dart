@@ -299,6 +299,7 @@ abstract class AppSettingProps with _$AppSettingProps {
     @Default(defaultFilters) List<Filter> filters,
     @Default(false) bool hideIp,
     @Default(true) bool requestsSplitView,
+    @Default(392) double requestsListWidth,
     @Default(true) bool requestsGroupByProcess,
     @Default([
       'destination',

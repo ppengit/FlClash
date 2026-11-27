@@ -5,6 +5,7 @@ import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/connection/tracker_rule.dart';
+import 'package:fl_clash/features/connection/connection_connected_buttons.dart';
 import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -17,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'connection_poller.dart';
 import 'http_capture.dart';
 import 'requests_detail_pane.dart';
+import 'requests_split.dart';
 import 'requests_table.dart';
 
 export 'requests_detail_pane.dart' show RequestsSegment;
@@ -52,6 +54,8 @@ class _RequestsViewState extends ConsumerState<RequestsView>
         RouteMotionHoldMixin<RequestsView> {
   final _rows = ConnectionRows();
   final _expandedProcesses = <String>{};
+  final _tableKey = GlobalKey<RequestsTableState>();
+  final _searchController = TextEditingController();
   var _query = '';
   var _rowsQuery = '';
   final _filters = connectionFilters();
@@ -205,6 +209,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     _httpFeed.dispose();
     _httpFilters.dispose();
     _httpSelected.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -536,65 +541,178 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     }
   }
 
-  List<PopupMenuItem> _buildMenuItems({
+  Widget _directButton({
+    required Glyph glyph,
+    required String label,
+    required VoidCallback? onPressed,
+  }) => IconButton(
+    tooltip: label,
+    onPressed: onPressed,
+    style: ButtonStyle.from(
+      shape: AppShape.sm,
+      minimumSize: const Size(36, 36),
+      tapTargetSize: TapTargetSize.shrinkWrap,
+    ),
+    icon: GlyphIcon(glyph, size: 18),
+  );
+
+  Widget _pageActions({
     required bool hasActive,
     required bool offersCapture,
     required bool requestsSplitView,
+    required double maxWidth,
   }) {
-    final appLocalizations = context.appLocalizations;
-    final section = offersCapture ? const PopupMenuSection() : null;
-    return [
-      if (offersCapture)
-        ...httpCaptureMenuItems(
-          ref,
-          appLocalizations,
-          mitm: ref.watch(
-            patchClashConfigProvider.select((state) => state.mitm),
-          ),
-          isAndroid: system.isAndroid,
-        ),
-      ...switch (_segment) {
-        RequestsSegment.connections => [
-          PopupMenuItem(
-            label: appLocalizations.closeActiveConnections,
-            danger: true,
-            section: section,
-            onPressed: hasActive ? _closeActiveConnections : null,
-          ),
-        ],
-        RequestsSegment.http => const <PopupMenuItem>[],
-        RequestsSegment.dns => [
-          PopupMenuItem(
-            label: appLocalizations.clearDnsCache,
-            section: section,
-            onPressed: _clearDnsCache,
-          ),
-        ],
-      },
-      if (!ViewScope.isMobileOf(context) &&
-          !requestsSplitView &&
-          _segment == RequestsSegment.connections)
-        ...requestsTableMenuItems(context, ref),
-      if (!ViewScope.isMobileOf(context))
-        PopupMenuItem(
-          glyph: AppGlyphs.dashboard,
-          label: appLocalizations.layout,
-          section: const PopupMenuSection(),
-          subItems: [
-            for (final split in [false, true])
-              PopupMenuItem(
-                label: split
-                    ? appLocalizations.listAndDetails
-                    : appLocalizations.list,
-                checked: requestsSplitView == split,
-                onPressed: () => ref
+    final l10n = context.appLocalizations;
+    final mobile = ViewScope.isMobileOf(context);
+    final table =
+        !mobile &&
+        !requestsSplitView &&
+        _segment == RequestsSegment.connections;
+    final grouped = ref.watch(
+      appSettingProvider.select((state) => state.requestsGroupByProcess),
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 6,
+          children: [
+            if (!mobile)
+              ConnectedFilterButtons<bool>(
+                values: const [false, true],
+                labelOf: (split) => split ? l10n.listAndDetails : l10n.list,
+                isSelected: (split) => requestsSplitView == split,
+                inMutuallyExclusiveGroup: true,
+                childBuilder: (split, selected) => GlyphIcon(
+                  split ? AppGlyphs.split : AppGlyphs.appsList,
+                  size: 18,
+                  color: selected
+                      ? context.colorScheme.onPrimary
+                      : context.colorScheme.onSurfaceVariant,
+                ),
+                onSelected: (split) => ref
                     .read(appSettingProvider.notifier)
                     .update(
                       (state) => state.copyWith(requestsSplitView: split),
                     ),
               ),
+            if (table) ...[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Checkbox(
+                    value: grouped,
+                    onChanged: (value) => ref
+                        .read(appSettingProvider.notifier)
+                        .update(
+                          (state) => state.copyWith(
+                            requestsGroupByProcess: value ?? false,
+                          ),
+                        ),
+                  ),
+                  PressRegion(
+                    onTap: () => ref
+                        .read(appSettingProvider.notifier)
+                        .update(
+                          (state) => state.copyWith(
+                            requestsGroupByProcess:
+                                !state.requestsGroupByProcess,
+                          ),
+                        ),
+                    child: Text(
+                      l10n.groupByProcess,
+                      style: AppTextStyle.footnote.of(context),
+                    ),
+                  ),
+                ],
+              ),
+              if (grouped) ...[
+                _directButton(
+                  glyph: AppGlyphs.chevronDown,
+                  label: l10n.expandAll,
+                  onPressed: () => _tableKey.currentState?.expandAll(true),
+                ),
+                _directButton(
+                  glyph: AppGlyphs.chevronUp,
+                  label: l10n.collapseAll,
+                  onPressed: () => _tableKey.currentState?.expandAll(false),
+                ),
+              ],
+              PopupAnchor(
+                targetBuilder: (open) => _directButton(
+                  glyph: AppGlyphs.sliders,
+                  label: l10n.visibleColumns,
+                  onPressed: open,
+                ),
+                popupBuilder: (_) =>
+                    PopupMenu(items: requestsTableColumnItems(context, ref)),
+              ),
+            ],
+            if (_segment == RequestsSegment.connections)
+              _directButton(
+                glyph: AppGlyphs.block,
+                label: l10n.closeActiveConnections,
+                onPressed: hasActive ? _closeActiveConnections : null,
+              ),
+            if (_segment == RequestsSegment.dns)
+              _directButton(
+                glyph: AppGlyphs.clearAll,
+                label: l10n.clearDnsCache,
+                onPressed: _clearDnsCache,
+              ),
+            if (offersCapture) ..._captureActions(),
           ],
         ),
+      ),
+    );
+  }
+
+  List<Widget> _captureActions() {
+    final l10n = context.appLocalizations;
+    final mitm = ref.watch(
+      patchClashConfigProvider.select((state) => state.mitm),
+    );
+    final items = httpCaptureMenuItems(
+      ref,
+      l10n,
+      mitm: mitm,
+      isAndroid: system.isAndroid,
+    );
+    return [
+      ConnectedFilterButtons<bool>(
+        values: const [true, false],
+        labelOf: (on) => on ? l10n.turnOn : l10n.turnOff,
+        isSelected: (on) => mitm.capture == on,
+        onSelected: (on) => items[on ? 0 : 1].onPressed?.call(),
+        childBuilder: (on, selected) => GlyphIcon(
+          on ? AppGlyphs.camera : AppGlyphs.block,
+          size: 18,
+          color: selected
+              ? context.colorScheme.onPrimary
+              : context.colorScheme.onSurfaceVariant,
+        ),
+        inMutuallyExclusiveGroup: true,
+      ),
+      PopupAnchor(
+        targetBuilder: (open) => _directButton(
+          glyph: AppGlyphs.memory,
+          label: l10n.httpCaptureLimit,
+          onPressed: open,
+        ),
+        popupBuilder: (_) => PopupMenu(
+          items: [
+            for (final item in items.last.subItems)
+              PopupMenuItem(
+                glyph: AppGlyphs.memory,
+                label: item.label,
+                checked: item.checked,
+                onPressed: item.onPressed,
+              ),
+          ],
+        ),
+      ),
     ];
   }
 
@@ -639,6 +757,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
               showsHttp: showsHttp,
               offersCapture: offersCapture,
               requestsSplitView: requestsSplitView,
+              width: width,
             );
           },
         ),
@@ -718,6 +837,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     required bool showsHttp,
     required bool offersCapture,
     required bool requestsSplitView,
+    required double width,
   }) {
     final mobile = ViewScope.isMobileOf(context);
     final list = mobile
@@ -726,103 +846,101 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     final header = _buildHeader(showsHttp: showsHttp);
     return Scaffold(
       title: PageLabel.requests.label,
-      searchState: AppBarSearchState(onSearch: _search),
-      header: split ? null : header,
-      menuItems: _buildMenuItems(
-        hasActive: hasActive,
-        offersCapture: offersCapture,
-        requestsSplitView: requestsSplitView,
-      ),
-      body: split ? _buildSplit(header, list) : list,
+      header: header,
+      actions: [
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: (width - (mobile ? 90 : 160)).clamp(160, 1200).toDouble(),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                switch (_segment) {
+                  RequestsSegment.connections => ConditionStatusButtons(
+                    controller: _filters,
+                  ),
+                  RequestsSegment.http => ConditionStatusButtons(
+                    controller: _httpFilters,
+                  ),
+                  RequestsSegment.dns => ConditionStatusButtons(
+                    controller: _dnsFilters,
+                  ),
+                },
+                _pageActions(
+                  hasActive: hasActive,
+                  offersCapture: offersCapture,
+                  requestsSplitView: requestsSplitView,
+                  maxWidth: 720,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      body: split ? _buildSplit(list) : list,
     );
   }
 
-  /// The bar spans both panes; the list keeps its header to itself, and the
-  /// pane beside it starts level with the header.
-  Widget _buildSplit(Widget header, Widget list) {
-    return Builder(
-      builder: (context) {
-        final barInset = MediaQuery.paddingOf(context).top;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: _listWidth,
-              child: Padding(
-                padding: EdgeInsets.only(top: barInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    header,
-                    Expanded(
-                      child: MediaQuery.removePadding(
-                        context: context,
-                        removeTop: true,
-                        child: FloatingBarScope(
-                          inset: 0,
-                          child: TopInsetScope(inset: 0, child: list),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Expanded(
-              child: RequestsDetailPane(
-                segment: _segment,
-                selected: _selected,
-                rows: _rows,
-                dnsSelected: _dnsSelected,
-                httpSelected: _httpSelected,
-                detailTitle: _detailTitle,
-                top: _headerTop,
-                onOpenConnection: _openConnection,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  Widget _buildSplit(Widget list) => RequestsSplit(
+    minDetailWidth: RequestsDetailPane.minWidth,
+    list: list,
+    detail: RequestsDetailPane(
+      segment: _segment,
+      selected: _selected,
+      rows: _rows,
+      dnsSelected: _dnsSelected,
+      httpSelected: _httpSelected,
+      detailTitle: _detailTitle,
+      top: _headerTop,
+      onOpenConnection: _openConnection,
+    ),
+  );
 
   Widget _buildHeader({required bool showsHttp}) {
     return Padding(
       padding: const EdgeInsets.only(top: _headerTop, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 12,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.listInsets.margin,
-            ),
-            child: SegmentedControl<RequestsSegment>(
-              segments: [
-                (
-                  RequestsSegment.connections,
-                  context.appLocalizations.connections,
-                ),
-                if (showsHttp) (RequestsSegment.http, 'HTTP'),
-                (RequestsSegment.dns, 'DNS'),
-              ],
-              value: _segment,
-              onChanged: _setSegment,
-            ),
-          ),
-          switch (_segment) {
-            RequestsSegment.connections => ConditionFilterRow(
-              controller: _filters,
-            ),
-            RequestsSegment.http => ConditionFilterRow(
-              controller: _httpFilters,
-            ),
-            RequestsSegment.dns => ConditionFilterRow(controller: _dnsFilters),
-          },
-        ],
-      ),
+      child: switch (_segment) {
+        RequestsSegment.connections => ConditionFilterRow(
+          controller: _filters,
+          searchController: _searchController,
+          onSearch: _search,
+          leadingFilters: _segmentButtons(showsHttp),
+        ),
+        RequestsSegment.http => ConditionFilterRow(
+          controller: _httpFilters,
+          searchController: _searchController,
+          onSearch: _search,
+          leadingFilters: _segmentButtons(showsHttp),
+        ),
+        RequestsSegment.dns => ConditionFilterRow(
+          controller: _dnsFilters,
+          searchController: _searchController,
+          onSearch: _search,
+          leadingFilters: _segmentButtons(showsHttp),
+        ),
+      },
     );
   }
+
+  Widget _segmentButtons(bool showsHttp) =>
+      ConnectedFilterButtons<RequestsSegment>(
+        values: [
+          RequestsSegment.connections,
+          if (showsHttp) RequestsSegment.http,
+          RequestsSegment.dns,
+        ],
+        labelOf: (segment) => switch (segment) {
+          RequestsSegment.connections => context.appLocalizations.connections,
+          RequestsSegment.http => 'HTTP',
+          RequestsSegment.dns => 'DNS',
+        },
+        isSelected: (segment) => segment == _segment,
+        onSelected: _setSegment,
+        inMutuallyExclusiveGroup: true,
+      );
 
   Widget _buildHttp(ScrollController scrollController) {
     return Consumer(
@@ -881,6 +999,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
             }
             if (table) {
               return RequestsTable(
+                key: _tableKey,
                 rows: _rows,
                 controller: scrollController,
                 expanded: _expandedProcesses,
@@ -930,6 +1049,8 @@ bool _showsHttp(PatchClashConfig state) => rsFeature && httpCapturing(state);
 
 bool _offersCapture(PatchClashConfig state) => rsFeature && state.mitm.enable;
 
-const _listWidth = 392.0;
 const _headerTop = 4.0;
-final _splitMinWidth = _listWidth + RequestsDetailPane.minWidth;
+final _splitMinWidth =
+    RequestsSplit.minListWidth +
+    RequestsSplit.handleWidth +
+    RequestsDetailPane.minWidth;

@@ -86,6 +86,23 @@ jobs:
       - name: Check coverage
         run: dart run tool/check_coverage.dart coverage/lcov.info 75
 
+      - name: Render request page previews
+        if: github.repository == 'ppengit/FlClash'
+        env:
+          FLCLASH_REQUEST_PREVIEW_DIR: build/request-previews
+          FLCLASH_PREVIEW_FONT_FILE: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+        run: |
+          sudo apt-get install -y fonts-dejavu-core
+          flutter test --no-pub test/views/requests_preview_test.dart --reporter expanded
+
+      - name: Upload request page previews
+        if: github.repository == 'ppengit/FlClash'
+        uses: actions/upload-artifact@v4
+        with:
+          name: request-page-previews
+          path: build/request-previews/*.png
+          if-no-files-found: error
+
   plugins:
     name: Plugins
     if: *checks
@@ -815,17 +832,14 @@ jobs:
             echo "基于上游 v${version%%-custom.*}，Windows amd64 安装包在完整仓库检查通过后由 ${{ github.sha }} 构建。"
             echo
             echo '<!-- flclash:changelog:begin -->'
-            echo '- 请求页“列表”视图升级为按进程分组的树形表格：可展开折叠、按列头排序、自选显示列、拖动列宽，设置会持久保存。'
-            echo '- 请求页保留快捷筛选标签，继续支持右键添加规则与查看详情；窄屏和双栏布局仍使用紧凑卡片。'
-            echo '- 面包屑统一字号，修正滚动时内容被顶部遮挡，以及部分页面重复计算顶部留白。'
-            echo '- “配置”管理入口与添加、排序、切换、更新全部等操作改称“订阅”；本地文件仍称“配置文件”。'
-            echo '- 编辑器保存期间锁定输入、标题与撤销重做，避免保存过程中继续输入造成丢字。'
-            echo '- 切换订阅时恢复各自上次使用的策略组标签；改进代理文件探测，避免旧结果覆盖新文件的操作状态。'
-            echo '- MITM 模块参数连续修改不再互相覆盖；快捷键录制可用键盘导航并保存。'
-            echo '- 上传订阅文件后立即编辑会打开上传内容；校验异常不再被当成校验成功。'
+            echo '- 请求页常驻搜索框；连接、DNS、TCP 与规则类型改为同一行的紧连按钮组，快捷筛选靠右排列。'
+            echo '- 全部、活动、失败状态改为标题栏计数按钮组，移除原搜索图标和三点菜单。'
+            echo '- 列表/双栏布局改用不同图标直接切换；进程分组、显示列、展开折叠和关闭连接等操作直接可见。'
+            echo '- 双栏中间分隔条支持拖动调整宽度，保存偏好；窗口缩小时保持两侧最小可用宽度。'
+            echo '- 降低请求表格斑马纹对比，保留清晰行列、实时统计、右键添加规则与详情查看。'
             echo '<!-- flclash:changelog:end -->'
             echo
-            echo '## Downloads'
+            echo '## 下载'
             echo
             while IFS= read -r name; do
               echo "- [${name}](https://github.com/${{ github.repository }}/releases/download/$TAG/${name})"

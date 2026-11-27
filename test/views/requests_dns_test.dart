@@ -126,14 +126,21 @@ void main() {
   }
 
   Future<void> clearDnsCache(WidgetTester tester) async {
-    await tester.tap(
+    final clear = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byTooltip('Clear DNS cache'),
+    );
+    expect(clear, findsOneWidget);
+    expect(
       find.descendant(
         of: find.byType(AppBar),
         matching: find.byGlyph(AppGlyphs.more),
       ),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-    await tester.tap(inMenu(find.text('Clear DNS cache')));
+    expect(find.byType(PopupMenu), findsNothing);
+    await tester.ensureVisible(clear);
+    await tester.tap(clear);
     await tester.pumpAndSettle();
   }
 
@@ -142,6 +149,12 @@ void main() {
 
     expect(find.text('No DNS queries yet'), findsOneWidget);
     expect(find.text('Select a query'), findsOneWidget);
+    expect(
+      find.byType(ConditionStatusButtons<DnsQuery, DnsStatus>),
+      findsOneWidget,
+    );
+    expect(statusButtonLabels(tester), ['All(0)', 'Failed(0)', 'Cache(0)']);
+    expect(selectedStatusText(tester), 'All(0)');
 
     await teardownView(tester);
   });
@@ -236,6 +249,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('gamma.test'), findsOneWidget);
+    expect(statusButtonLabels(tester), ['All(2)', 'Failed(0)', 'Cache(0)']);
 
     await teardownView(tester);
   });
@@ -862,6 +876,7 @@ void main() {
   ];
 
   Future<void> switchTo(WidgetTester tester, String segment) async {
+    await tester.ensureVisible(find.text(segment).first);
     await tester.tap(find.text(segment).first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -993,6 +1008,7 @@ void main() {
       _dnsQuery('new.test').copyWith(time: start.add(const Duration(hours: 2))),
     );
     await tester.pump(const Duration(seconds: 1));
+    await tester.ensureVisible(find.text('DNS').first);
     await tester.tap(find.text('DNS').first);
     await tester.pump();
 

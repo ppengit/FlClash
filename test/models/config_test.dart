@@ -147,6 +147,7 @@ void main() {
       expect(restored.autoCheckUpdate, true);
       expect(restored.sidebarExpanded, true);
       expect(restored.requestsSplitView, true);
+      expect(restored.requestsListWidth, 392);
       expect(restored.minimizeOnExit, true);
       expect(restored.restoreStrategy, RestoreStrategy.compatible);
       expect(restored.userAgents, defaultUserAgents);

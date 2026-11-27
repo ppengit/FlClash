@@ -55,56 +55,61 @@ List<TableColumn> requestsTableColumns(BuildContext context) {
   }
 }
 
-List<PopupMenuItem> requestsTableMenuItems(
+List<PopupMenuItem> requestsTableColumnItems(
   BuildContext context,
   WidgetRef ref,
 ) {
-  final settings = ref.watch(appSettingProvider);
+  final settings = ref.read(appSettingProvider);
   final l10n = context.appLocalizations;
   return [
+    for (final column in requestsTableColumns(context))
+      PopupMenuItem(
+        glyph: switch (column.id) {
+          'destination' => AppGlyphs.target,
+          'process' => AppGlyphs.appsList,
+          'network' => AppGlyphs.language,
+          'rule' => AppGlyphs.rules,
+          'exit' => AppGlyphs.proxies,
+          'download' || 'downloadSpeed' => AppGlyphs.arrowDown,
+          'upload' || 'uploadSpeed' => AppGlyphs.arrowUp,
+          'start' => AppGlyphs.clock,
+          _ => AppGlyphs.filter,
+        },
+        label: column.label,
+        checked:
+            column.id == 'destination' ||
+            settings.requestsColumns.contains(column.id),
+        keepsOpen: true,
+        onPressed: column.id == 'destination'
+            ? null
+            : () => ref.read(appSettingProvider.notifier).update((state) {
+                final columns = {...state.requestsColumns};
+                if (!columns.remove(column.id)) columns.add(column.id);
+                return state.copyWith(
+                  requestsColumns: columns.toList(),
+                  requestsSortColumn:
+                      state.requestsSortColumn == column.id &&
+                          !columns.contains(column.id)
+                      ? null
+                      : state.requestsSortColumn,
+                );
+              }),
+      ),
     PopupMenuItem(
-      label: l10n.visibleColumns,
+      glyph: AppGlyphs.reset,
+      label: l10n.reset,
       section: const PopupMenuSection(),
-      subItems: [
-        for (final column in requestsTableColumns(context))
-          PopupMenuItem(
-            label: column.label,
-            checked:
-                column.id == 'destination' ||
-                settings.requestsColumns.contains(column.id),
-            keepsOpen: true,
-            onPressed: column.id == 'destination'
-                ? null
-                : () => ref.read(appSettingProvider.notifier).update((state) {
-                    final columns = {...state.requestsColumns};
-                    if (!columns.remove(column.id)) {
-                      columns.add(column.id);
-                    }
-                    return state.copyWith(
-                      requestsColumns: columns.toList(),
-                      requestsSortColumn:
-                          !columns.contains(state.requestsSortColumn)
-                          ? null
-                          : state.requestsSortColumn,
-                    );
-                  }),
+      onPressed: () => ref
+          .read(appSettingProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              requestsColumns: const AppSettingProps().requestsColumns,
+              requestsSortColumn: null,
+              requestsSortDescending: false,
+              tableColumnWidths: {...state.tableColumnWidths}
+                ..remove('requests'),
+            ),
           ),
-        PopupMenuItem(
-          label: l10n.reset,
-          section: const PopupMenuSection(),
-          onPressed: () => ref
-              .read(appSettingProvider.notifier)
-              .update(
-                (state) => state.copyWith(
-                  requestsColumns: const AppSettingProps().requestsColumns,
-                  requestsSortColumn: null,
-                  requestsSortDescending: false,
-                  tableColumnWidths: {...state.tableColumnWidths}
-                    ..remove('requests'),
-                ),
-              ),
-        ),
-      ],
     ),
   ];
 }
@@ -130,10 +135,10 @@ class RequestsTable extends ConsumerStatefulWidget {
   final String detailTitle;
 
   @override
-  ConsumerState<RequestsTable> createState() => _RequestsTableState();
+  RequestsTableState createState() => RequestsTableState();
 }
 
-class _RequestsTableState extends ConsumerState<RequestsTable>
+class RequestsTableState extends ConsumerState<RequestsTable>
     with
         TableColumnWidthsMixin<RequestsTable>,
         ArrivalCacheExtentMixin<RequestsTable> {
@@ -264,7 +269,7 @@ class _RequestsTableState extends ConsumerState<RequestsTable>
     });
   }
 
-  void _expandAll(bool expand) {
+  void expandAll(bool expand) {
     setState(() {
       for (final group in _tree.groups) {
         expand
@@ -391,112 +396,60 @@ class _RequestsTableState extends ConsumerState<RequestsTable>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            spacing: 8,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 6,
-                children: [
-                  Checkbox(
-                    value: prefs.grouped,
-                    onChanged: (value) => ref
-                        .read(appSettingProvider.notifier)
-                        .update(
-                          (state) => state.copyWith(
-                            requestsGroupByProcess: value ?? false,
-                          ),
-                        ),
-                  ),
-                  PressRegion(
-                    shape: AppShape.none,
-                    onTap: () => ref
-                        .read(appSettingProvider.notifier)
-                        .update(
-                          (state) => state.copyWith(
-                            requestsGroupByProcess:
-                                !state.requestsGroupByProcess,
-                          ),
-                        ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        l10n.groupByProcess,
-                        style: AppTextStyle.footnote.of(context),
-                      ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: ListenableBuilder(
+              listenable: widget.controller,
+              builder: (context, _) {
+                final count = '${l10n.connections}: ${widget.rows.shownCount}';
+                ConnectionTreeGroup? group;
+                if (_ranges.isNotEmpty) {
+                  final offset = widget.controller.hasClients
+                      ? widget.controller.offset
+                      : 0.0;
+                  final index = ((offset - 4) / rowHeight).floor().clamp(
+                    0,
+                    _count - 1,
+                  );
+                  var low = 0;
+                  var high = _ranges.length;
+                  while (low < high) {
+                    final mid = (low + high) >> 1;
+                    if (_ranges[mid].end <= index) {
+                      low = mid + 1;
+                    } else {
+                      high = mid;
+                    }
+                  }
+                  group = _ranges[low].group;
+                }
+                final name = group == null
+                    ? null
+                    : group.label.isEmpty
+                    ? l10n.unknown
+                    : group.label;
+                final path = group == null
+                    ? ''
+                    : widget.rows
+                              .heldInfoOf(group.representativeId)
+                              ?.metadata
+                              .processPath ??
+                          '';
+                return Tooltip(
+                  message: path.isEmpty ? name ?? count : path,
+                  child: Text(
+                    key: const ValueKey('requestsProcessContext'),
+                    name == null ? count : '$count · $name',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style.copyWith(
+                      color: context.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
-              ),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: widget.controller,
-                  builder: (context, _) {
-                    final count =
-                        '${l10n.connections}: ${widget.rows.shownCount}';
-                    ConnectionTreeGroup? group;
-                    if (_ranges.isNotEmpty) {
-                      final offset = widget.controller.hasClients
-                          ? widget.controller.offset
-                          : 0.0;
-                      final index = ((offset - 4) / rowHeight).floor().clamp(
-                        0,
-                        _count - 1,
-                      );
-                      var low = 0;
-                      var high = _ranges.length;
-                      while (low < high) {
-                        final mid = (low + high) >> 1;
-                        if (_ranges[mid].end <= index) {
-                          low = mid + 1;
-                        } else {
-                          high = mid;
-                        }
-                      }
-                      group = _ranges[low].group;
-                    }
-                    final name = group == null
-                        ? null
-                        : group.label.isEmpty
-                        ? l10n.unknown
-                        : group.label;
-                    final path = group == null
-                        ? ''
-                        : widget.rows
-                                  .heldInfoOf(group.representativeId)
-                                  ?.metadata
-                                  .processPath ??
-                              '';
-                    return Tooltip(
-                      message: path.isEmpty ? name ?? count : path,
-                      child: Text(
-                        key: const ValueKey('requestsProcessContext'),
-                        name == null ? count : '$count · $name',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: style.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              if (prefs.grouped) ...[
-                IconButton(
-                  tooltip: l10n.expandAll,
-                  icon: const GlyphIcon(AppGlyphs.chevronDown, size: 18),
-                  onPressed: () => _expandAll(true),
-                ),
-                IconButton(
-                  tooltip: l10n.collapseAll,
-                  icon: const GlyphIcon(AppGlyphs.chevronUp, size: 18),
-                  onPressed: () => _expandAll(false),
-                ),
-              ],
-            ],
+                );
+              },
+            ),
           ),
-          const SizedBox(height: 8),
           Expanded(
             child: WidthBuilder(
               builder: (context, width) {
@@ -694,7 +647,11 @@ class RequestsTableRow extends StatelessWidget {
           builder: (context) {
             final row = PressSurface(
               fill: striped
-                  ? SurfaceLevel.inset.colorOf(context.colorScheme)
+                  ? Color.lerp(
+                      context.surfaceLevel.colorOf(context.colorScheme),
+                      context.raisedSurfaceLevel.colorOf(context.colorScheme),
+                      0.28,
+                    )!
                   : Colors.transparent,
               shape: AppShape.none,
               selected: selected,

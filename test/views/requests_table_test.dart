@@ -170,6 +170,7 @@ void main() {
         _request('3', 'Editor.exe', download: 20),
       ]);
       await pump(tester);
+      await tester.ensureVisible(find.byTooltip('Expand all'));
       await tester.tap(find.byTooltip('Expand all'));
       await tester.pumpAndSettle();
       expect(ids(tester), ['3', '2', '1']);
@@ -200,14 +201,15 @@ void main() {
       await pump(tester);
       await tester.tap(group('Editor.exe'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(Chip, 'TCP'));
+      await tester.ensureVisible(find.widgetWithText(PressSurface, 'TCP'));
+      await tester.tap(find.widgetWithText(PressSurface, 'TCP'));
       await tester.pumpAndSettle();
       expect(group('Browser.exe'), findsNothing);
       expect(ids(tester), ['1']);
       expect(tester.widget<RequestsProcessRow>(group('Editor.exe')).group.ids, [
         '1',
       ]);
-      await tester.tap(find.widgetWithText(Chip, 'TCP'));
+      await tester.tap(find.widgetWithText(PressSurface, 'TCP'));
       await tester.pumpAndSettle();
       expect(ids(tester), ['2', '1']);
       expect(group('Browser.exe'), findsOneWidget);
@@ -220,26 +222,43 @@ void main() {
   ) async {
     seed([_request('1', 'Editor.exe'), _request('2', 'Browser.exe')]);
     await pump(tester);
-    expect(find.byType(Checkbox), findsOneWidget);
-    await tester.tap(find.text('Group by process'));
+    final bar = find.byType(AppBar);
+    final grouping = find.descendant(of: bar, matching: find.byType(Checkbox));
+    expect(grouping, findsOneWidget);
+    expect(tester.widget<Checkbox>(grouping).value, isTrue);
+    final groupingLabel = find.descendant(
+      of: bar,
+      matching: find.text('Group by process'),
+    );
+    expect(groupingLabel, findsOneWidget);
+    expect(
+      find.descendant(of: bar, matching: find.byGlyph(AppGlyphs.more)),
+      findsNothing,
+    );
+    expect(tester.widget<Scaffold>(find.byType(Scaffold)).menuItems, isEmpty);
+    await tester.tap(groupingLabel);
     await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(grouping).value, isFalse);
     expect(find.byType(RequestsProcessRow), findsNothing);
     expect(ids(tester), ['2', '1']);
+    expect(find.byTooltip('Expand all'), findsNothing);
+    expect(find.byTooltip('Collapse all'), findsNothing);
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byGlyph(AppGlyphs.more),
-      ),
+    final columns = find.descendant(
+      of: bar,
+      matching: find.byTooltip('Columns'),
     );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(PopupMenu),
-        matching: find.text('Columns'),
-      ),
+    expect(columns, findsOneWidget);
+    expect(
+      find.ancestor(of: columns, matching: find.byType(PopupAnchor)),
+      findsOneWidget,
     );
+    await tester.ensureVisible(columns);
+    await tester.tap(columns);
     await tester.pumpAndSettle();
+    expect(find.byType(PopupMenu), findsOneWidget);
+    expect(find.text('Layout'), findsNothing);
+    expect(find.text('Columns'), findsNothing);
     await tester.tap(
       find.descendant(
         of: find.byType(PopupMenu),
@@ -274,6 +293,7 @@ void main() {
     (tester) async {
       seed([for (var i = 0; i < 200; i++) _request('$i', 'Editor.exe')]);
       await pump(tester);
+      await tester.ensureVisible(find.byTooltip('Expand all'));
       await tester.tap(find.byTooltip('Expand all'));
       await tester.pumpAndSettle();
       final headerRect = tester.getRect(header('destination'));
@@ -291,6 +311,7 @@ void main() {
         contains('Editor.exe'),
       );
       expect(find.byType(RequestsTableRow).evaluate().length, lessThan(50));
+      await tester.ensureVisible(find.byTooltip('Collapse all'));
       await tester.tap(find.byTooltip('Collapse all'));
       await tester.pumpAndSettle();
       expect(find.byType(RequestsTableRow), findsNothing);
@@ -312,6 +333,7 @@ void main() {
           );
       seed([for (var i = 0; i < 100; i++) _request('$i', 'Editor.exe')]);
       await pump(tester, size: const Size(720, 900));
+      await tester.ensureVisible(find.byTooltip('Expand all'));
       await tester.tap(find.byTooltip('Expand all'));
       await tester.pumpAndSettle();
       final horizontal = tester.widget<SingleChildScrollView>(

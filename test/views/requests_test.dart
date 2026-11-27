@@ -5,6 +5,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
+import 'package:fl_clash/features/connection/connection_connected_buttons.dart';
 import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/manager/hotkey_manager.dart';
 import 'package:fl_clash/models/models.dart';
@@ -13,6 +14,7 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/connection/requests.dart';
 import 'package:fl_clash/views/connection/requests_table.dart';
+import 'package:fl_clash/views/connection/requests_split.dart';
 import 'package:fl_clash/views/connection/requests_detail_pane.dart'
     show RequestsDetailPane;
 import 'package:fl_clash/widgets/widgets.dart';
@@ -291,8 +293,6 @@ void main() {
     expect(find.text('No failed connections'), findsOneWidget);
     expect(find.text('No matching results'), findsNothing);
 
-    await tester.tap(find.byTooltip('Search'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'nowhere.test');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
@@ -465,23 +465,14 @@ void main() {
       findsOneWidget,
     );
     final list = tester.getRect(find.byType(ScrollToEndBox));
-    final segment = tester.getRect(
-      find.byType(SegmentedControl<RequestsSegment>),
+    final toolbar = tester.getRect(
+      find.byType(ConditionFilterRow<TrackerInfo, ConnectionStatus>),
     );
-    expect(
-      tester.getRect(find.byTooltip('Search')).left,
-      greaterThan(list.right),
-    );
-    expect(
-      tester
-          .getTopLeft(
-            find
-                .ancestor(of: empty, matching: find.byType(ClipRSuperellipse))
-                .first,
-          )
-          .dy,
-      segment.top,
-    );
+    final pane = tester.getRect(find.byType(RequestsDetailPane));
+    expect(toolbar.left, lessThan(list.right));
+    expect(toolbar.right, greaterThan(pane.left));
+    expect(list.top, greaterThanOrEqualTo(toolbar.bottom));
+    expect(pane.top, list.top);
 
     await tester.tap(targetOf('alpha.test'));
     await tester.pumpAndSettle();
@@ -489,19 +480,7 @@ void main() {
     expect(find.byType(TrackerSelectedDetail), findsOneWidget);
     expect(tester.widget<TrackerInfoHeader>(header).trackerInfo.id, 'a');
     expect(tester.getTopLeft(header).dx, greaterThanOrEqualTo(list.right));
-    expect(
-      tester
-          .getTopLeft(
-            find
-                .ancestor(
-                  of: find.byType(TrackerSelectedDetail),
-                  matching: find.byType(ClipRSuperellipse),
-                )
-                .first,
-          )
-          .dy,
-      segment.top,
-    );
+    expect(tester.getRect(find.byType(RequestsDetailPane)), pane);
     expect(selectedRows(tester), ['a']);
     expect(tester.getRect(find.byType(ScrollToEndBox)), list);
 
@@ -518,55 +497,137 @@ void main() {
     await teardownView(tester);
   });
 
-  Finder inMenu(Finder finder) =>
-      find.descendant(of: find.byType(PopupMenu), matching: finder);
-
   final more = find.descendant(
     of: find.byType(AppBar),
     matching: find.byGlyph(AppGlyphs.more),
   );
 
-  Future<void> openSubMenu(WidgetTester tester, String label) async {
-    await tester.tap(more);
-    await tester.pumpAndSettle();
-    await tester.tap(inMenu(find.text(label)));
+  Finder directButton(String label) => find
+      .ancestor(of: find.byTooltip(label), matching: find.byType(IconButton))
+      .first;
+
+  final layoutControl = find.ancestor(
+    of: find.byTooltip('List'),
+    matching: find.byType(ConnectedFilterButtons<bool>),
+  );
+
+  ConnectedFilterButtons<bool> layoutButtons(WidgetTester tester) =>
+      tester.widget<ConnectedFilterButtons<bool>>(layoutControl);
+
+  Future<void> chooseLayout(WidgetTester tester, String label) async {
+    final button = find.descendant(
+      of: layoutControl,
+      matching: find.byTooltip(label),
+    );
+    await tester.ensureVisible(button);
+    await tester.tap(button);
     await tester.pumpAndSettle();
   }
 
+  testWidgets('search stays left of the connected filters on one row, with '
+      'direct titlebar actions and no search or more action', (tester) async {
+    seedRequests([
+      _tracker(id: 'a', host: 'alpha.test'),
+      _tracker(id: 'b', host: 'beta.test', network: 'udp'),
+    ]);
+    for (final size in [const Size(390, 844), _sheetSize, _tableSize]) {
+      await pumpRequests(tester, size: size);
+      final search = inFilterRow(find.byType(SearchField));
+      final segments = inFilterRow(
+        find.byType(ConnectedFilterButtons<RequestsSegment>),
+      );
+      final facets = inFilterRow(find.byType(ConnectedFilterButtons<String>));
+      expect(search, findsOneWidget);
+      expect(segments, findsOneWidget);
+      expect(facets, findsWidgets);
+      final searchRect = tester.getRect(search);
+      final segmentRect = tester.getRect(segments);
+      expect(searchRect.right, lessThan(segmentRect.left));
+      expect(searchRect.center.dy, closeTo(segmentRect.center.dy, .01));
+      for (final facet in facets.evaluate()) {
+        final rect = tester.getRect(find.byWidget(facet.widget));
+        expect(rect.left, greaterThan(segmentRect.right));
+        expect(rect.center.dy, closeTo(searchRect.center.dy, .01));
+      }
+      final scaffold = tester.widget<Scaffold>(
+        find.ancestor(of: search, matching: find.byType(Scaffold)).first,
+      );
+      expect(scaffold.searchState, isNull);
+      expect(scaffold.menuItems, isEmpty);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byGlyph(AppGlyphs.search),
+        ),
+        findsNothing,
+      );
+      expect(find.byGlyph(AppGlyphs.more), findsNothing);
+      expect(find.byType(SegmentedControl<RequestsSegment>), findsNothing);
+      expect(directButton('Close all active connections'), findsOneWidget);
+      if (size.width > _listSize.width) {
+        expect(layoutControl, findsOneWidget);
+        expect(
+          find.descendant(
+            of: layoutControl,
+            matching: find.byGlyph(AppGlyphs.appsList),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: layoutControl,
+            matching: find.byGlyph(AppGlyphs.split),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: layoutControl, matching: find.byType(Text)),
+          findsNothing,
+        );
+      }
+      expect(tester.takeException(), isNull, reason: '$size');
+      await teardownView(tester);
+    }
+  });
+
   testWidgets(
-    'request segments keep the same pill shape when selection changes',
+    'request segments keep their connected shapes when selection changes',
     (tester) async {
       seedRequests([_tracker(id: 'a', host: 'alpha.test')]);
-      final control = find.byType(SegmentedControl<RequestsSegment>);
+      final control = find.byType(ConnectedFilterButtons<RequestsSegment>);
 
       for (final size in [_listSize, _tableSize]) {
         await pumpRequests(tester, size: size);
+        final shapes = tester
+            .widgetList<PressSurface>(
+              find.descendant(of: control, matching: find.byType(PressSurface)),
+            )
+            .map((button) => button.shape)
+            .toList();
+        expect(find.byType(SegmentedControl<RequestsSegment>), findsNothing);
         for (final segment in [
           RequestsSegment.connections,
           RequestsSegment.dns,
           RequestsSegment.connections,
         ]) {
-          await tester.tap(
-            find.descendant(
-              of: control,
-              matching: find.text(
-                segment == RequestsSegment.dns ? 'DNS' : 'Connections',
-              ),
+          final button = find.descendant(
+            of: control,
+            matching: find.byTooltip(
+              segment == RequestsSegment.dns ? 'DNS' : 'Connections',
             ),
           );
+          await tester.ensureVisible(button);
+          await tester.tap(button);
           await tester.pumpAndSettle();
-          expect(
-            tester.widget<SegmentedControl<RequestsSegment>>(control).value,
-            segment,
+          final group = tester.widget<ConnectedFilterButtons<RequestsSegment>>(
+            control,
           );
+          expect(group.values.where(group.isSelected), [segment]);
           final buttons = tester.widgetList<PressSurface>(
             find.descendant(of: control, matching: find.byType(PressSurface)),
           );
           expect(buttons, hasLength(2));
-          expect(
-            buttons.map((button) => button.shape),
-            everyElement(AppShape.full),
-          );
+          expect(buttons.map((button) => button.shape), shapes);
           expect(buttons.where((button) => button.selected), hasLength(1));
         }
         expect(targetOf('alpha.test'), findsOneWidget);
@@ -575,33 +636,17 @@ void main() {
     },
   );
 
-  PopupMenuItem layoutMenu(WidgetTester tester) => tester
-      .widget<Scaffold>(
-        find
-            .ancestor(
-              of: find.byType(SegmentedControl<RequestsSegment>),
-              matching: find.byType(Scaffold),
-            )
-            .first,
-      )
-      .menuItems
-      .singleWhere((item) => item.label == 'Layout');
-
-  testWidgets('the wide layout menu moves the selected connection between '
+  testWidgets('the wide layout buttons move the selected connection between '
       'the pane and sheet without clearing it', (tester) async {
     seedRequests([_tracker(id: 'a', host: 'alpha.test')]);
     await pumpRequests(tester);
     await tester.tap(targetOf('alpha.test'));
     await tester.pumpAndSettle();
-    final splitAction = layoutMenu(tester).subItems.last.onPressed!;
-    expect(layoutMenu(tester).subItems.map((item) => item.checked), [
-      false,
-      true,
-    ]);
+    final splitAction = layoutButtons(tester).onSelected;
+    expect(layoutButtons(tester).isSelected(true), isTrue);
+    expect(layoutButtons(tester).isSelected(false), isFalse);
 
-    await openSubMenu(tester, 'Layout');
-    await tester.tap(inMenu(find.text('List')));
-    await tester.pumpAndSettle();
+    await chooseLayout(tester, 'List');
     expect(container.read(appSettingProvider).requestsSplitView, isFalse);
     expect(find.byType(RequestsDetailPane), findsNothing);
     expect(find.byType(TrackerInfoDetailSheet), findsOneWidget);
@@ -613,12 +658,10 @@ void main() {
       'a',
     );
     expect(selectedRows(tester), ['a']);
-    expect(layoutMenu(tester).subItems.map((item) => item.checked), [
-      true,
-      false,
-    ]);
+    expect(layoutButtons(tester).isSelected(false), isTrue);
+    expect(layoutButtons(tester).isSelected(true), isFalse);
 
-    splitAction();
+    splitAction(true);
     await tester.pumpAndSettle();
     expect(container.read(appSettingProvider).requestsSplitView, isTrue);
     expect(find.byType(RequestsDetailPane), findsOneWidget);
@@ -631,43 +674,33 @@ void main() {
       'a',
     );
     expect(selectedRows(tester), ['a']);
-    expect(layoutMenu(tester).subItems.map((item) => item.checked), [
-      false,
-      true,
-    ]);
+    expect(layoutButtons(tester).isSelected(true), isTrue);
+    expect(layoutButtons(tester).isSelected(false), isFalse);
     expect(tester.takeException(), isNull);
     await teardownView(tester);
   });
 
   testWidgets(
-    'the layout menu choice survives leaving and reopening requests',
+    'the layout button choice survives leaving and reopening requests',
     (tester) async {
       container.listen(appSettingProvider, (_, _) {});
       await pumpRequests(tester);
-      await openSubMenu(tester, 'Layout');
-      await tester.tap(inMenu(find.text('List')));
-      await tester.pumpAndSettle();
+      await chooseLayout(tester, 'List');
       expect(find.byType(RequestsDetailPane), findsNothing);
       await teardownView(tester);
 
       await pumpRequests(tester);
       expect(find.byType(RequestsDetailPane), findsNothing);
-      expect(layoutMenu(tester).subItems.map((item) => item.checked), [
-        true,
-        false,
-      ]);
-      await openSubMenu(tester, 'Layout');
-      await tester.tap(inMenu(find.text('List and details')));
-      await tester.pumpAndSettle();
+      expect(layoutButtons(tester).isSelected(false), isTrue);
+      expect(layoutButtons(tester).isSelected(true), isFalse);
+      await chooseLayout(tester, 'List and details');
       expect(find.byType(RequestsDetailPane), findsOneWidget);
       await teardownView(tester);
 
       await pumpRequests(tester);
       expect(find.byType(RequestsDetailPane), findsOneWidget);
-      expect(layoutMenu(tester).subItems.map((item) => item.checked), [
-        false,
-        true,
-      ]);
+      expect(layoutButtons(tester).isSelected(true), isTrue);
+      expect(layoutButtons(tester).isSelected(false), isFalse);
       await teardownView(tester);
     },
   );
@@ -675,13 +708,14 @@ void main() {
   testWidgets('list and details still requires the minimum pane width', (
     tester,
   ) async {
-    final minWidth = 392 + RequestsDetailPane.minWidth;
+    final minWidth =
+        RequestsSplit.minListWidth +
+        RequestsSplit.handleWidth +
+        RequestsDetailPane.minWidth;
     await pumpRequests(tester, size: Size(minWidth - 1, 1000));
     expect(find.byType(RequestsDetailPane), findsNothing);
     for (final label in ['List', 'List and details']) {
-      await openSubMenu(tester, 'Layout');
-      await tester.tap(inMenu(find.text(label)));
-      await tester.pumpAndSettle();
+      await chooseLayout(tester, label);
       expect(find.byType(RequestsDetailPane), findsNothing);
     }
     expect(container.read(appSettingProvider).requestsSplitView, isTrue);
@@ -887,37 +921,35 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('quick filter chips offer facet values and toggle the list', (
-    tester,
-  ) async {
-    seedRequests([
-      _tracker(id: 'tcp', host: 'tcp.test'),
-      _tracker(id: 'udp', host: 'udp.test', network: 'udp'),
-    ]);
-    await pumpRequests(tester);
+  testWidgets(
+    'quick connected filters offer facet values and toggle the list',
+    (tester) async {
+      seedRequests([
+        _tracker(id: 'tcp', host: 'tcp.test'),
+        _tracker(id: 'udp', host: 'udp.test', network: 'udp'),
+      ]);
+      await pumpRequests(tester);
 
-    expect(find.widgetWithText(Chip, 'TCP'), findsOneWidget);
-    expect(find.widgetWithText(Chip, 'UDP'), findsOneWidget);
-    expect(targetOf('udp.test'), findsOneWidget);
+      final tcp = inFilterRow(find.widgetWithText(PressSurface, 'TCP'));
+      final udp = inFilterRow(find.widgetWithText(PressSurface, 'UDP'));
+      expect(tcp, findsOneWidget);
+      expect(udp, findsOneWidget);
+      expect(targetOf('udp.test'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(Chip, 'TCP'));
-    await tester.pumpAndSettle();
-    expect(targetOf('udp.test'), findsNothing);
-    expect(targetOf('tcp.test'), findsOneWidget);
-    expect(
-      tester.widget<Chip>(find.widgetWithText(Chip, 'TCP')).selected,
-      isTrue,
-    );
+      await tester.ensureVisible(tcp);
+      await tester.tap(tcp);
+      await tester.pumpAndSettle();
+      expect(targetOf('udp.test'), findsNothing);
+      expect(targetOf('tcp.test'), findsOneWidget);
+      expect(tester.widget<PressSurface>(tcp).selected, isTrue);
 
-    await tester.tap(find.widgetWithText(Chip, 'TCP'));
-    await tester.pumpAndSettle();
-    expect(targetOf('udp.test'), findsOneWidget);
-    expect(
-      tester.widget<Chip>(find.widgetWithText(Chip, 'TCP')).selected,
-      isFalse,
-    );
-    await teardownView(tester);
-  });
+      await tester.tap(tcp);
+      await tester.pumpAndSettle();
+      expect(targetOf('udp.test'), findsOneWidget);
+      expect(tester.widget<PressSurface>(tcp).selected, isFalse);
+      await teardownView(tester);
+    },
+  );
 
   group('adding rules from requests', () {
     const first = Profile(
@@ -1515,8 +1547,7 @@ void main() {
     await tester.tap(targetOf(selected.metadata.host).hitTestable());
     await tester.pumpAndSettle();
 
-    layoutMenu(tester).subItems.first.onPressed!();
-    await tester.pumpAndSettle();
+    await chooseLayout(tester, 'List');
     final table = tester.widget<RequestsTable>(find.byType(RequestsTable));
     expect(table.rows, same(rows));
     expect(rows.following, isTrue);
@@ -1568,8 +1599,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(rows.shownCount, 1);
 
-      layoutMenu(tester).subItems.first.onPressed!();
-      await tester.pumpAndSettle();
+      await chooseLayout(tester, 'List');
       expect(find.byType(RequestsTable), findsOneWidget);
       expect(rows.following, isTrue);
       expect(rows.holdsNew, isFalse);
@@ -2113,6 +2143,7 @@ void main() {
       connectionsReader: () async => live,
     );
     await tester.pump(const Duration(seconds: 1));
+    await tester.ensureVisible(find.text('DNS').first);
     await tester.tap(find.text('DNS').first);
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -2136,6 +2167,7 @@ void main() {
       }
     };
     addTearDown(() => debugOnRebuildDirtyWidget = null);
+    await tester.ensureVisible(find.text('Connections').first);
     await tester.tap(find.text('Connections').first);
     for (var frame = 0; frame < 8; frame++) {
       builtByFrame.add([]);
@@ -2189,8 +2221,10 @@ void main() {
             },
           );
           await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('DNS').first);
           await tester.tap(find.text('DNS').first);
           await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Connections').first);
           await tester.tap(find.text('Connections').first);
           await tester.pumpAndSettle();
           final rows = table
@@ -2538,7 +2572,16 @@ void main() {
       await pumpRequests(tester, size: size);
       double rightGap(Finder finder) =>
           size.width - tester.getRect(finder.first).right;
-      final barEnd = find.ancestor(of: more, matching: find.byType(IconButton));
+      final barEnd = find
+          .descendant(
+            of: find.byType(AppBar),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is SingleChildScrollView &&
+                  widget.scrollDirection == Axis.horizontal,
+            ),
+          )
+          .first;
       final add = find.ancestor(
         of: addCondition,
         matching: find.byType(IconButton),
@@ -2556,8 +2599,8 @@ void main() {
     });
   }
 
-  testWidgets('the menu closes the active connections only once that is '
-      'confirmed, and offers no grouping', (tester) async {
+  testWidgets('the direct close button closes active connections only once '
+      'confirmed, with no overflow menu', (tester) async {
     final core = _MockCore();
     when(core.closeConnections).thenAnswer((_) async {});
     container.dispose();
@@ -2573,17 +2616,16 @@ void main() {
     seedRequests([alpha, beta]);
 
     await pumpRequests(tester, connectionsReader: () async => [alpha, beta]);
-    await tester.tap(more);
-    await tester.pumpAndSettle();
+    final close = directButton('Close all active connections');
+    expect(close, findsOneWidget);
+    expect(tester.widget<IconButton>(close).onPressed, isNotNull);
     expect(
-      [
-        for (final item in tester.widgetList<PopupMenu>(find.byType(PopupMenu)))
-          for (final entry in item.items) (entry.label, entry.danger),
-      ],
-      [('Close all active connections', true), ('Layout', false)],
+      find.descendant(of: close, matching: find.byGlyph(AppGlyphs.block)),
+      findsOneWidget,
     );
-
-    await tester.tap(inMenu(find.text('Close all active connections')));
+    expect(more, findsNothing);
+    expect(find.byType(PopupMenu), findsNothing);
+    await tester.tap(close);
     await tester.pumpAndSettle();
     expect(
       find.textContaining('2 active connections will close.'),
@@ -2593,7 +2635,8 @@ void main() {
     await tester.pumpAndSettle();
     verifyNever(core.closeConnections);
 
-    await openSubMenu(tester, 'Close all active connections');
+    await tester.tap(close);
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
     await tester.pumpAndSettle();
     verify(core.closeConnections).called(1);
@@ -2601,34 +2644,32 @@ void main() {
     await teardownView(tester);
   });
 
-  testWidgets('the menu greys out closing with no connection open, and the '
-      'DNS queries clear the cache from theirs', (tester) async {
+  testWidgets('the direct close button is disabled with no connection open, '
+      'and DNS offers its direct clear-cache button instead', (tester) async {
     seedRequests([_tracker(id: 'a', host: 'alpha.test')]);
     container.read(requestsProvider.notifier).close(['a']);
 
     await pumpRequests(tester);
-    await tester.tap(more);
-    await tester.pumpAndSettle();
-    final close = tester
-        .widgetList<PopupMenu>(find.byType(PopupMenu))
-        .expand((menu) => menu.items)
-        .singleWhere((item) => item.label == 'Close all active connections');
-    expect(close.label, 'Close all active connections');
+    final close = tester.widget<IconButton>(
+      directButton('Close all active connections'),
+    );
     expect(close.onPressed, isNull);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
+    expect(more, findsNothing);
+    expect(find.byType(PopupMenu), findsNothing);
 
+    await tester.ensureVisible(find.text('DNS'));
     await tester.tap(find.text('DNS'));
     await tester.pumpAndSettle();
-    await tester.tap(more);
-    await tester.pumpAndSettle();
+    expect(find.byTooltip('Close all active connections'), findsNothing);
+    final clear = directButton('Clear DNS cache');
+    expect(clear, findsOneWidget);
+    expect(tester.widget<IconButton>(clear).onPressed, isNotNull);
     expect(
-      [
-        for (final item in tester.widgetList<PopupMenu>(find.byType(PopupMenu)))
-          for (final entry in item.items) entry.label,
-      ],
-      ['Clear DNS cache', 'Layout'],
+      find.descendant(of: clear, matching: find.byGlyph(AppGlyphs.clearAll)),
+      findsOneWidget,
     );
+    expect(more, findsNothing);
+    expect(find.byType(PopupMenu), findsNothing);
 
     await teardownView(tester);
   });
@@ -2642,8 +2683,6 @@ void main() {
     ]);
 
     await pumpRequests(tester, size: _listSize);
-    await tester.tap(find.byTooltip('Search'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'app:chrome -host:gamma');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
@@ -2779,8 +2818,8 @@ void main() {
     await teardownView(tester);
   });
 
-  testWidgets('the status menu counts the connections live, checks the one '
-      'shown and shows one status at a time', (tester) async {
+  testWidgets('the status buttons count connections live, select the one '
+      'shown and show one status at a time', (tester) async {
     final open = _tracker(id: 'a', host: 'alpha.test');
     seedRequests([
       open,
@@ -2789,33 +2828,99 @@ void main() {
 
     await pumpRequests(tester, connectionsReader: () async => [open]);
     await tester.pump(const Duration(milliseconds: 400));
-    expect(shownStatusText(tester), 'All 2');
-    await openStatusMenu(tester);
-    expect(statusMenuItems(tester), ['All 2 ✓', 'Active 1', 'Failed 1']);
+    expect(
+      find.byType(ConditionStatusButtons<TrackerInfo, ConnectionStatus>),
+      findsOneWidget,
+    );
+    expect(statusButtonLabels(tester), ['All(2)', 'Active(1)', 'Failed(1)']);
+    expect(selectedStatusText(tester), 'All(2)');
+    expect(find.byType(PopupMenu), findsNothing);
     addRequest(_failed(id: 'c', host: 'gamma.test', second: 3));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(statusMenuItems(tester), ['All 3 ✓', 'Active 1', 'Failed 2']);
-    expect(shownStatusText(tester), 'All 3');
-    await closeStatusMenu(tester);
+    expect(statusButtonLabels(tester), ['All(3)', 'Active(1)', 'Failed(2)']);
+    expect(selectedStatusText(tester), 'All(3)');
 
     await pickStatus(tester, 'Failed 2');
-    expect(shownStatusText(tester), 'Failed 2');
-    await openStatusMenu(tester);
-    expect(statusMenuItems(tester), ['All 3', 'Active 1', 'Failed 2 ✓']);
-    await closeStatusMenu(tester);
+    expect(selectedStatusText(tester), 'Failed(2)');
     expect(targetOf('alpha.test'), findsNothing);
     expect(recordLinesIn(tester), ['[!Timeout]', '[!Timeout]']);
 
     await pickStatus(tester, 'Active 1');
-    expect(shownStatusText(tester), 'Active 1');
+    expect(selectedStatusText(tester), 'Active(1)');
     expect(targetOf('alpha.test'), findsWidgets);
     expect(targetOf('beta.test'), findsNothing);
 
-    await tester.tap(more);
-    await tester.pumpAndSettle();
-    expect(inMenu(find.text('Filter')), findsNothing);
-    expect(inMenu(find.text('Group by')), findsNothing);
+    await chooseLayout(tester, 'List');
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.byType(Checkbox)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Group by process'),
+      ),
+      findsOneWidget,
+    );
+    final scaffold = tester.widget<Scaffold>(
+      find.ancestor(of: layoutControl, matching: find.byType(Scaffold)).first,
+    );
+    expect(scaffold.menuItems, isEmpty);
+    expect(more, findsNothing);
+    expect(find.byType(PopupMenu), findsNothing);
 
+    await teardownView(tester);
+  });
+
+  testWidgets('status count updates do not read connection records', (
+    tester,
+  ) async {
+    final controller = ConditionFilterController<TrackerInfo, ConnectionStatus>(
+      facets: const [],
+      statuses: ConnectionStatus.values,
+      fields: const [],
+      labelOf: (status) => switch (status) {
+        ConnectionStatus.all => 'All',
+        ConnectionStatus.active => 'Active',
+        ConnectionStatus.failed => 'Failed',
+      },
+      statusHolds: (status, info) => status.holds(info),
+      showsText: (count) => count,
+      valuesInText: (field) => field,
+      conditionTip: () => '',
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      TestApp(child: ConditionStatusButtons(controller: controller)),
+    );
+    var reads = 0;
+    void offer(int all) => controller.offerCounts(
+      {
+        ConnectionStatus.all: all,
+        ConnectionStatus.active: 1,
+        ConnectionStatus.failed: all - 1,
+      },
+      () {
+        reads++;
+        return const [];
+      },
+    );
+    offer(222);
+    await tester.pump();
+    expect(statusButtonLabels(tester), [
+      'All(222)',
+      'Active(1)',
+      'Failed(221)',
+    ]);
+    offer(223);
+    await tester.pump();
+    expect(statusButtonLabels(tester), [
+      'All(223)',
+      'Active(1)',
+      'Failed(222)',
+    ]);
+    expect(reads, 0);
+    expect(find.byType(PopupMenu), findsNothing);
     await teardownView(tester);
   });
 
