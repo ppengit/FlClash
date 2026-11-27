@@ -389,30 +389,36 @@ void main() {
       ConditionStatusButtons(controller: controller, maxWidth: 600),
     );
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    final active = find.text('Active(9)');
-    final focus = Focus.of(tester.element(active));
-    focus.requestFocus();
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
-    expect(controller.status, _Status.active);
-    expect(focus.hasPrimaryFocus, isTrue);
-    final activeNode = tester.getSemantics(
-      find.ancestor(of: active, matching: find.byType(MergeSemantics)).first,
-    );
-    expect(activeNode.mergeAllDescendantsIntoThisNode, isTrue);
-    final activeSemantics = activeNode.getSemanticsData();
-    expect(activeSemantics.label, 'Active(9)');
-    expect(activeSemantics.flagsCollection.isButton, isTrue);
-    expect(activeSemantics.flagsCollection.isSelected.toBoolOrNull(), isTrue);
-    expect(activeSemantics.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    await tester.pump();
-    expect(controller.status, _Status.failed);
-    expect(tester.takeException(), isNull);
+    try {
+      final active = find.text('Active(9)');
+      final focus = Focus.of(tester.element(active));
+      focus.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(controller.status, _Status.active);
+      expect(focus.hasPrimaryFocus, isTrue);
+      final activeNode = tester.getSemantics(
+        find.ancestor(of: active, matching: find.byType(MergeSemantics)).first,
+      );
+      expect(activeNode.mergeAllDescendantsIntoThisNode, isTrue);
+      final activeSemantics = activeNode.getSemanticsData();
+      expect(activeSemantics.label, 'Active(9)');
+      expect(activeSemantics.flagsCollection.isButton, isTrue);
+      expect(activeSemantics.flagsCollection.isSelected.toBoolOrNull(), isTrue);
+      expect(
+        activeSemantics.flagsCollection.isInMutuallyExclusiveGroup,
+        isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(controller.status, _Status.failed);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('connected buttons adjoin with square inner corners', (
@@ -468,13 +474,16 @@ void main() {
       ),
     );
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    expect(find.byTooltip('List'), findsOneWidget);
-    expect(find.bySemanticsLabel('List'), findsOneWidget);
-    expect(
-      tester.getSize(find.byType(ConnectedFilterButtons<bool>)).width,
-      lessThanOrEqualTo(60),
-    );
-    expect(tester.takeException(), isNull);
+    try {
+      expect(find.byTooltip('List'), findsOneWidget);
+      expect(find.bySemanticsLabel('List'), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(ConnectedFilterButtons<bool>)).width,
+        lessThanOrEqualTo(60),
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 }

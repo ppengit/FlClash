@@ -80,12 +80,6 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         run: dart run tool/changelog.dart verify
 
-      - name: Run tests
-        run: dart run tool/test.dart -- --reporter expanded --coverage
-
-      - name: Check coverage
-        run: dart run tool/check_coverage.dart coverage/lcov.info 75
-
       - name: Render request page previews
         if: github.repository == 'ppengit/FlClash'
         env:
@@ -102,6 +96,12 @@ jobs:
           name: request-page-previews
           path: build/request-previews/*.png
           if-no-files-found: error
+
+      - name: Run tests
+        run: dart run tool/test.dart -- --reporter expanded --coverage
+
+      - name: Check coverage
+        run: dart run tool/check_coverage.dart coverage/lcov.info 75
 
   plugins:
     name: Plugins

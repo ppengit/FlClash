@@ -393,8 +393,10 @@ void main() {
 
     final floor = sheetTop(tester);
     final gesture = await tester.startGesture(
-      Offset(_mobileSize.width / 2, floor + 12),
+      tester.getCenter(find.byType(SheetDragHandle)),
     );
+    await gesture.moveBy(const Offset(0, 20));
+    await tester.pump();
     await gesture.moveBy(const Offset(0, 140));
     await tester.pump();
 
