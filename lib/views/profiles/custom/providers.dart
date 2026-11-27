@@ -35,43 +35,46 @@ class CustomProvidersView extends ConsumerWidget {
     };
     return Scaffold(
       title: appLocalizations.providers,
-      body: NullStatusSwitcher(
-        isEmpty: proxy.isEmpty && rule.isEmpty,
-        nullStatus: NullStatus(
-          label: appLocalizations.nullTip(appLocalizations.providers),
-          illustration: NullStatusIllustration.proxies,
-        ),
-        child: ListView(
-          padding: context.listInsets.page().copyWith(
-            top: context.sectionsTopPadding,
-            bottom: 16 + context.bottomInset,
+      body: Builder(
+        builder: (context) => NullStatusSwitcher(
+          isEmpty: proxy.isEmpty && rule.isEmpty,
+          nullStatus: NullStatus(
+            label: appLocalizations.nullTip(appLocalizations.providers),
+            illustration: NullStatusIllustration.proxies,
           ),
-          children: [
-            generateSection(
-              title: appLocalizations.proxies,
-              items: [
-                for (final name in proxy)
-                  _ProxyProviderItem(
-                    profileId: profileId,
-                    name: name,
-                    profile: profiles[name],
-                    invalid:
-                        data != null && !data.proxyProviders.contains(name),
-                  ),
-              ],
+          child: ListView(
+            padding: context.listInsets.page().copyWith(
+              top: context.sectionsTopPadding,
+              bottom: 16 + context.bottomInset,
             ),
-            generateSection(
-              title: appLocalizations.rules,
-              items: [
-                for (final name in rule)
-                  _RuleProviderItem(
-                    name: name,
-                    provider: ruleProviders[name],
-                    invalid: data != null && !data.ruleProviders.contains(name),
-                  ),
-              ],
-            ),
-          ],
+            children: [
+              generateSection(
+                title: appLocalizations.proxies,
+                items: [
+                  for (final name in proxy)
+                    _ProxyProviderItem(
+                      profileId: profileId,
+                      name: name,
+                      profile: profiles[name],
+                      invalid:
+                          data != null && !data.proxyProviders.contains(name),
+                    ),
+                ],
+              ),
+              generateSection(
+                title: appLocalizations.rules,
+                items: [
+                  for (final name in rule)
+                    _RuleProviderItem(
+                      name: name,
+                      provider: ruleProviders[name],
+                      invalid:
+                          data != null && !data.ruleProviders.contains(name),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

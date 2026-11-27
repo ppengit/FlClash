@@ -3,36 +3,129 @@ import 'package:fl_clash/features/connection/connection_filters.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-TrackerInfo _connection(String id, {bool open = true}) => TrackerInfo(
+TrackerInfo _connection(
+  String id, {
+  bool open = true,
+  String network = 'tcp',
+  String rule = 'MATCH',
+}) => TrackerInfo(
   id: id,
   start: DateTime.utc(2026, 11, 22),
-  metadata: const Metadata(network: 'tcp', process: 'curl'),
+  metadata: Metadata(network: network, process: 'curl'),
   chains: const ['Proxy'],
-  rule: 'MATCH',
+  rule: rule,
   rulePayload: '',
   closedAt: open ? null : DateTime.utc(2026, 11, 22, 0, 1),
 );
 
+enum _TestStatus { all }
+
 void main() {
-  test('offering connections counts their statuses, tells only of a count '
-      'that moved, and builds no facet options a condition page never '
-      'reads', () {
+  test(
+    'offering connections counts statuses and offers fixed facet values',
+    () {
+      final controller = connectionFilters();
+      addTearDown(controller.dispose);
+      var told = 0;
+      controller.counted.addListener(() => told++);
+
+      controller.offer([_connection('a'), _connection('b', open: false)]);
+      expect(controller.countOf(ConnectionStatus.all), 2);
+      expect(controller.countOf(ConnectionStatus.active), 1);
+      expect(told, 1);
+      expect(controller.options.value, {
+        RecordFacetKind.network: ['tcp'],
+        RecordFacetKind.rule: ['MATCH'],
+      });
+
+      controller.offer([_connection('a'), _connection('c', open: false)]);
+      expect(told, 1);
+      controller.offer([_connection('a')]);
+      expect(controller.countOf(ConnectionStatus.all), 1);
+      expect(told, 2);
+    },
+  );
+
+  testWidgets(
+    'the first records offer their chips without waiting on an empty feed throttle',
+    (tester) async {
+      final controller = connectionFilters();
+      addTearDown(controller.dispose);
+      controller.offer(const []);
+      await tester.pump(const Duration(milliseconds: 100));
+      controller.offer([_connection('a')]);
+      expect(controller.options.value, {
+        RecordFacetKind.network: ['tcp'],
+        RecordFacetKind.rule: ['MATCH'],
+      });
+    },
+  );
+
+  testWidgets('offers changed facet values after the throttle without another '
+      'refresh', (tester) async {
     final controller = connectionFilters();
     addTearDown(controller.dispose);
-    var told = 0;
-    controller.counted.addListener(() => told++);
 
-    controller.offer([_connection('a'), _connection('b', open: false)]);
-    expect(controller.countOf(ConnectionStatus.all), 2);
-    expect(controller.countOf(ConnectionStatus.active), 1);
-    expect(told, 1);
+    controller.offer([_connection('a')]);
+    controller.offer([_connection('b', network: 'udp', rule: 'REJECT')]);
+
+    expect(controller.options.value, {
+      RecordFacetKind.network: ['tcp'],
+      RecordFacetKind.rule: ['MATCH'],
+    });
+    await tester.pump(const Duration(seconds: 2));
+    expect(controller.options.value, {
+      RecordFacetKind.network: ['udp'],
+      RecordFacetKind.rule: ['REJECT'],
+    });
+  });
+
+  testWidgets('cancels a pending option refresh on dispose', (tester) async {
+    final controller = connectionFilters();
+    controller.offer([_connection('a')]);
+    controller.offer([_connection('b', network: 'udp')]);
+    controller.dispose();
+
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  test('clears empty options immediately and retains selected values', () {
+    final controller = connectionFilters();
+    addTearDown(controller.dispose);
+
+    controller.offer([_connection('a')]);
+    controller.offer(const []);
     expect(controller.options.value, isEmpty);
 
-    controller.offer([_connection('a'), _connection('c', open: false)]);
-    expect(told, 1);
-    controller.offer([_connection('a')]);
-    expect(controller.countOf(ConnectionStatus.all), 1);
-    expect(told, 2);
+    controller.add(const RecordFilter(RecordFacetKind.network, 'tcp'));
+    controller.offer(const []);
+    expect(controller.options.value, {
+      RecordFacetKind.network: ['tcp'],
+    });
+  });
+
+  test('does not read items to offer when no facet is offered', () {
+    final controller = ConditionFilterController<int, _TestStatus>(
+      facets: [
+        RecordFacet(RecordFacetKind.network, (_) => ['tcp']),
+      ],
+      statuses: _TestStatus.values,
+      fields: const [],
+      labelOf: (_) => '',
+      statusHolds: (_, _) => true,
+      showsText: (_) => '',
+      valuesInText: (_) => '',
+      conditionTip: () => '',
+    );
+    addTearDown(controller.dispose);
+    var reads = 0;
+
+    controller.offerCounts({_TestStatus.all: 1}, () {
+      reads++;
+      return [1];
+    });
+
+    expect(reads, 0);
   });
 
   test('a status alone filters without narrowing past the status', () {

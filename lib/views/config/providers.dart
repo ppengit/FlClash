@@ -362,23 +362,25 @@ class _ClashProvidersViewState extends ConsumerState<ClashProvidersView> {
         illustration: NullStatusIllustration.rules,
         label: appLocalizations.nullTip(appLocalizations.ruleProviders),
       ),
-      child: PrismReorderableListView(
-        padding: context.listInsets
-            .page(top: 16, bottom: 16)
-            .copyWith(
-              top: context.contentTopPadding,
-              bottom: 16 + context.bottomInset,
-            ),
-        itemCount: providers.length,
-        itemBuilder: (_, index) => _buildItem(providers, index),
-        proxyDecorator: (_, index, animation) {
-          return commonProxyDecorator(
-            _buildItem(providers, index),
-            index,
-            animation,
-          );
-        },
-        onReorderItem: ref.read(clashProvidersProvider.notifier).order,
+      child: Builder(
+        builder: (context) => PrismReorderableListView(
+          padding: context.listInsets
+              .page(top: 16, bottom: 16)
+              .copyWith(
+                top: context.contentTopPadding,
+                bottom: 16 + context.bottomInset,
+              ),
+          itemCount: providers.length,
+          itemBuilder: (_, index) => _buildItem(providers, index),
+          proxyDecorator: (_, index, animation) {
+            return commonProxyDecorator(
+              _buildItem(providers, index),
+              index,
+              animation,
+            );
+          },
+          onReorderItem: ref.read(clashProvidersProvider.notifier).order,
+        ),
       ),
     );
   }

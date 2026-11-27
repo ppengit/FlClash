@@ -475,69 +475,71 @@ class _MitmOptionsViewState extends ConsumerState<MitmOptionsView>
     return Scaffold(
       title: appLocalizations.options,
       isLoading: ref.watch(loadingProvider(LoadingTag.mitm)),
-      body: NullStatusSwitcher(
-        isLoading: certificate.isLoading && !certificate.hasValue,
-        child: ListView(
-          padding: context.listInsets.page().copyWith(
-            top: context.contentTopPadding,
-            bottom: 16 + context.bottomInset,
+      body: Builder(
+        builder: (context) => NullStatusSwitcher(
+          isLoading: certificate.isLoading && !certificate.hasValue,
+          child: ListView(
+            padding: context.listInsets.page().copyWith(
+              top: context.contentTopPadding,
+              bottom: 16 + context.bottomInset,
+            ),
+            children: [
+              generateSection(
+                items: _certificateItems(
+                  context,
+                  ref,
+                  certificate,
+                  canTrust: canTrust,
+                ),
+                footer: _certificateTip(
+                  appLocalizations,
+                  canTrust: canTrust,
+                  check: check,
+                ),
+              ),
+              generateSection(
+                items: [
+                  ConfigToggleItem(
+                    title: (l) => l.skipServerCertVerify,
+                    selector: patchClashConfigProvider.select(
+                      (state) => state.mitm.skipServerCertVerify,
+                    ),
+                    onChanged: _mitmWriter(
+                      (state, value) =>
+                          state.copyWith(skipServerCertVerify: value),
+                    ),
+                  ),
+                  ConfigToggleItem(
+                    title: (l) => l.blockQuic,
+                    selector: patchClashConfigProvider.select(
+                      (state) => state.mitm.autoQuicBlock,
+                    ),
+                    onChanged: _mitmWriter(
+                      (state, value) => state.copyWith(autoQuicBlock: value),
+                    ),
+                  ),
+                  ConfigToggleItem(
+                    title: (l) => l.http2,
+                    selector: patchClashConfigProvider.select(
+                      (state) => state.mitm.h2,
+                    ),
+                    onChanged: _mitmWriter(
+                      (state, value) => state.copyWith(h2: value),
+                    ),
+                  ),
+                  ConfigToggleItem(
+                    title: (l) => l.decryptUntrusted,
+                    selector: patchClashConfigProvider.select(
+                      (state) => state.mitm.decryptUntrusted,
+                    ),
+                    onChanged: _mitmWriter(
+                      (state, value) => state.copyWith(decryptUntrusted: value),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          children: [
-            generateSection(
-              items: _certificateItems(
-                context,
-                ref,
-                certificate,
-                canTrust: canTrust,
-              ),
-              footer: _certificateTip(
-                appLocalizations,
-                canTrust: canTrust,
-                check: check,
-              ),
-            ),
-            generateSection(
-              items: [
-                ConfigToggleItem(
-                  title: (l) => l.skipServerCertVerify,
-                  selector: patchClashConfigProvider.select(
-                    (state) => state.mitm.skipServerCertVerify,
-                  ),
-                  onChanged: _mitmWriter(
-                    (state, value) =>
-                        state.copyWith(skipServerCertVerify: value),
-                  ),
-                ),
-                ConfigToggleItem(
-                  title: (l) => l.blockQuic,
-                  selector: patchClashConfigProvider.select(
-                    (state) => state.mitm.autoQuicBlock,
-                  ),
-                  onChanged: _mitmWriter(
-                    (state, value) => state.copyWith(autoQuicBlock: value),
-                  ),
-                ),
-                ConfigToggleItem(
-                  title: (l) => l.http2,
-                  selector: patchClashConfigProvider.select(
-                    (state) => state.mitm.h2,
-                  ),
-                  onChanged: _mitmWriter(
-                    (state, value) => state.copyWith(h2: value),
-                  ),
-                ),
-                ConfigToggleItem(
-                  title: (l) => l.decryptUntrusted,
-                  selector: patchClashConfigProvider.select(
-                    (state) => state.mitm.decryptUntrusted,
-                  ),
-                  onChanged: _mitmWriter(
-                    (state, value) => state.copyWith(decryptUntrusted: value),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

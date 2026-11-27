@@ -376,31 +376,33 @@ class _OnDemandViewState extends ConsumerState<OnDemandView>
     final excludeSSIDs = ref.watch(excludeSSIDsProvider);
     final selectedItems = ref.watch(itemsProvider(key));
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: context.listInsets.page().copyWith(
-              top: context.sectionsTopPadding,
+      body: Builder(
+        builder: (context) => CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: context.listInsets.page().copyWith(
+                top: context.sectionsTopPadding,
+              ),
+              sliver: SliverToBoxAdapter(child: _buildPrerequisites()),
             ),
-            sliver: SliverToBoxAdapter(child: _buildPrerequisites()),
-          ),
-          SliverPadding(
-            padding: context.listInsets.page(),
-            sliver: SliverToBoxAdapter(child: _buildExcludeSsidsHeader()),
-          ),
-          _buildExcludeSsidsList(excludeSSIDs, selectedItems),
-          SliverPadding(
-            padding: context.listInsets.page().copyWith(
-              bottom: 16 + context.bottomInset,
+            SliverPadding(
+              padding: context.listInsets.page(),
+              sliver: SliverToBoxAdapter(child: _buildExcludeSsidsHeader()),
             ),
-            sliver: SliverToBoxAdapter(
-              child: ListFooter(
-                text: context.appLocalizations.excludeSsidsDesc,
-                last: true,
+            _buildExcludeSsidsList(excludeSSIDs, selectedItems),
+            SliverPadding(
+              padding: context.listInsets.page().copyWith(
+                bottom: 16 + context.bottomInset,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: ListFooter(
+                  text: context.appLocalizations.excludeSsidsDesc,
+                  last: true,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       title: context.appLocalizations.onDemand,
     );

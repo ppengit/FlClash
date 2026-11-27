@@ -73,13 +73,15 @@ class DisclaimerView extends StatelessWidget {
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     final terms = _buildTerms(appLocalizations);
-    final body = _buildBody(
-      padding: const EdgeInsets.symmetric(horizontal: _mobileGutter).copyWith(
-        top: context.contentTopPadding,
-        // Below the terms the consent bar takes the system bar itself.
-        bottom: 32 + (requireConsent ? 0 : context.bottomInset),
+    final body = Builder(
+      builder: (context) => _buildBody(
+        padding: const EdgeInsets.symmetric(horizontal: _mobileGutter).copyWith(
+          top: context.contentTopPadding,
+          // Below the terms the consent bar takes the system bar itself.
+          bottom: 32 + (requireConsent ? 0 : context.bottomInset),
+        ),
+        children: terms,
       ),
-      children: terms,
     );
     if (!requireConsent) {
       return Scaffold(title: appLocalizations.disclaimer, body: body);

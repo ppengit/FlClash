@@ -838,6 +838,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get columns => '列数';
 
   @override
+  String get visibleColumns => '表示する列';
+
+  @override
+  String get groupByProcess => 'プロセスでグループ化';
+
+  @override
+  String get expandAll => 'すべて展開';
+
+  @override
+  String get collapseAll => 'すべて折りたたむ';
+
+  @override
+  String get downloadSpeed => 'ダウンロード速度';
+
+  @override
+  String get uploadSpeed => 'アップロード速度';
+
+  @override
   String get proxyGroup => 'プロキシグループ';
 
   @override

@@ -102,7 +102,7 @@ class EditorPage extends ConsumerStatefulWidget {
   final String Function(String text)? edit;
 
   /// A returned future is the save still running: until it completes the
-  /// page takes no second save and no pointer.
+  /// page takes no second save and no edits.
   final FutureOr<void> Function(
     BuildContext context,
     String title,
@@ -303,6 +303,7 @@ class _EditorPageState extends ConsumerState<EditorPage>
   }
 
   void _handleSearch({bool replace = false}) {
+    if (_saving) return;
     _editor?.search(replace: replace);
   }
 
@@ -310,7 +311,7 @@ class _EditorPageState extends ConsumerState<EditorPage>
     _editor?.controller?.commitComposition();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     final onSave = widget.onSave;
     if (onSave == null || readOnly || _saving) {
       return;
@@ -323,20 +324,18 @@ class _EditorPageState extends ConsumerState<EditorPage>
     if (route != null && !route.isCurrent) {
       Navigator.of(context).popUntil((above) => above == route);
     }
-    final saved = onSave(
-      context,
-      _titleController.text,
-      _EditedContent(_editor!.controller!),
-    );
-    if (saved is! Future<void>) {
-      return;
-    }
+    final controller = _editor!.controller!;
     setState(() => _saving = true);
-    unawaited(
-      saved.whenComplete(() {
-        if (mounted) setState(() => _saving = false);
-      }),
-    );
+    controller.readOnly = true;
+    FocusScope.of(context).unfocus();
+    try {
+      await onSave(context, _titleController.text, _EditedContent(controller));
+    } finally {
+      if (mounted) {
+        controller.readOnly = readOnly;
+        setState(() => _saving = false);
+      }
+    }
   }
 
   Future<bool> _handlePop(BuildContext context) async {
@@ -376,13 +375,13 @@ class _EditorPageState extends ConsumerState<EditorPage>
           child: Scaffold(
             titleWidget: _EditorTitleField(
               controller: _titleController,
-              enabled: widget.titleEditable,
+              enabled: widget.titleEditable && !_saving,
             ),
             iconActions: [
               IconButtonData(
                 glyph: AppGlyphs.search,
                 tooltip: appLocalizations.search,
-                onPressed: isReady ? _handleSearch : null,
+                onPressed: isReady && !_saving ? _handleSearch : null,
               ),
             ],
             confirmationAction: widget.onSave == null
@@ -398,12 +397,20 @@ class _EditorPageState extends ConsumerState<EditorPage>
               PopupMenuItem(
                 glyph: AppGlyphs.undo,
                 label: appLocalizations.undo,
-                onPressed: _barState.canUndo ? _undoController.undo : null,
+                onPressed: _barState.canUndo && !_saving
+                    ? () {
+                        if (!_saving) _undoController.undo();
+                      }
+                    : null,
               ),
               PopupMenuItem(
                 glyph: AppGlyphs.redo,
                 label: appLocalizations.redo,
-                onPressed: _barState.canRedo ? _undoController.redo : null,
+                onPressed: _barState.canRedo && !_saving
+                    ? () {
+                        if (!_saving) _undoController.redo();
+                      }
+                    : null,
               ),
               PopupMenuItem(
                 glyph: AppGlyphs.textSize,
@@ -439,14 +446,17 @@ class _EditorPageState extends ConsumerState<EditorPage>
             ],
             body: AbsorbPointer(
               absorbing: _saving,
-              child: EditorView(
-                key: _editorKey,
-                document: _document,
-                language: widget.language,
-                schema: widget.schema,
-                readOnly: readOnly,
-                undoController: _undoController,
-                onReady: _handleReady,
+              child: ExcludeFocus(
+                excluding: _saving,
+                child: EditorView(
+                  key: _editorKey,
+                  document: _document,
+                  language: widget.language,
+                  schema: widget.schema,
+                  readOnly: readOnly || _saving,
+                  undoController: _undoController,
+                  onReady: _handleReady,
+                ),
               ),
             ),
           ),

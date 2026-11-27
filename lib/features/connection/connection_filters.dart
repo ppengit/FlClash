@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -7,6 +9,8 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/foundation.dart';
 
 enum ConnectionStatus { all, active, failed }
+
+const _optionsThrottle = Duration(seconds: 2);
 
 extension ConnectionStatusExt on ConnectionStatus {
   bool holds(TrackerInfo trackerInfo) => switch (this) {
@@ -53,6 +57,7 @@ class ConditionFilterController<T extends Object, S extends Enum>
   var _conditions = <RecordCondition<T>>[];
   var _statusCounts = <S, int>{};
   DateTime? _optionsAt;
+  Timer? _optionsTimer;
   List<T> Function() _offered = () => const [];
 
   ConditionFilterController({
@@ -264,8 +269,6 @@ class ConditionFilterController<T extends Object, S extends Enum>
     return (excluding: excluding, rows: rows);
   }
 
-  /// Counts the statuses only: a page filtered by conditions reads no facet
-  /// options, which would cost a pass over every item on each refresh.
   @override
   void offer(Iterable<T> items) {
     final offered = items is List<T> ? items : items.toList();
@@ -280,20 +283,48 @@ class ConditionFilterController<T extends Object, S extends Enum>
     offerCounts(statusCounts, () => offered);
   }
 
-  /// [items] is read only when a draft needs them.
   void offerCounts(Map<S, int> statusCounts, List<T> Function() items) {
     _offered = items;
-    final now = DateTime.now();
-    final last = _optionsAt;
-    if (last == null || now.difference(last) >= const Duration(seconds: 2)) {
-      _optionsAt = now;
-      super.offer(items());
-    }
+    final all = statuses.first;
+    _offerOptions(force: statusCounts[all] == 0 || _statusCounts[all] == 0);
     if (MapEquality<S, int>().equals(statusCounts, _statusCounts)) {
       return;
     }
     _statusCounts = statusCounts;
     _counted.value++;
+  }
+
+  bool get _hasOfferedFacets => facets.any((facet) => facet.offered);
+
+  void _offerOptions({bool force = false}) {
+    if (!_hasOfferedFacets) {
+      return;
+    }
+    final now = DateTime.now();
+    final last = _optionsAt;
+    if (force || last == null) {
+      _emitOptions(now);
+      return;
+    }
+    final elapsed = now.difference(last);
+    if (elapsed.isNegative || elapsed >= _optionsThrottle) {
+      _emitOptions(now);
+      return;
+    }
+    if (_optionsTimer != null) {
+      return;
+    }
+    _optionsTimer = Timer(_optionsThrottle - elapsed, () {
+      _optionsTimer = null;
+      _emitOptions(DateTime.now());
+    });
+  }
+
+  void _emitOptions(DateTime at) {
+    _optionsTimer?.cancel();
+    _optionsTimer = null;
+    _optionsAt = at;
+    super.offer(_offered());
   }
 
   bool isValueSelected(RecordFacetKind kind, String value) =>
@@ -305,6 +336,7 @@ class ConditionFilterController<T extends Object, S extends Enum>
 
   @override
   void dispose() {
+    _optionsTimer?.cancel();
     _counted.dispose();
     super.dispose();
   }

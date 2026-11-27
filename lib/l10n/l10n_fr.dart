@@ -875,6 +875,24 @@ class AppLocalizationsFr extends AppLocalizations {
   String get columns => 'Colonnes';
 
   @override
+  String get visibleColumns => 'Colonnes visibles';
+
+  @override
+  String get groupByProcess => 'Regrouper par processus';
+
+  @override
+  String get expandAll => 'Tout développer';
+
+  @override
+  String get collapseAll => 'Tout réduire';
+
+  @override
+  String get downloadSpeed => 'Vitesse de téléchargement';
+
+  @override
+  String get uploadSpeed => 'Vitesse d’envoi';
+
+  @override
   String get proxyGroup => 'Groupe de proxys';
 
   @override

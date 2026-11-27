@@ -63,23 +63,25 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
         illustration: NullStatusIllustration.scripts,
         label: appLocalizations.nullTip(appLocalizations.script),
       ),
-      child: PrismReorderableListView(
-        padding: context.listInsets
-            .page(top: 16, bottom: 16)
-            .copyWith(
-              top: context.contentTopPadding,
-              bottom: 16 + context.bottomInset,
-            ),
-        itemCount: scripts.length,
-        itemBuilder: (_, index) => _buildItem(scripts, index),
-        proxyDecorator: (_, index, animation) {
-          return commonProxyDecorator(
-            _buildItem(scripts, index),
-            index,
-            animation,
-          );
-        },
-        onReorderItem: ref.read(scriptsProvider.notifier).order,
+      child: Builder(
+        builder: (context) => PrismReorderableListView(
+          padding: context.listInsets
+              .page(top: 16, bottom: 16)
+              .copyWith(
+                top: context.contentTopPadding,
+                bottom: 16 + context.bottomInset,
+              ),
+          itemCount: scripts.length,
+          itemBuilder: (_, index) => _buildItem(scripts, index),
+          proxyDecorator: (_, index, animation) {
+            return commonProxyDecorator(
+              _buildItem(scripts, index),
+              index,
+              animation,
+            );
+          },
+          onReorderItem: ref.read(scriptsProvider.notifier).order,
+        ),
       ),
     );
   }

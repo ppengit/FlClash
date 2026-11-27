@@ -92,34 +92,36 @@ class CustomProxyDialersView extends ConsumerWidget {
           ];
     return Scaffold(
       title: appLocalizations.dialerProxy,
-      body: NullStatusSwitcher(
-        isLoading: proxies == null,
-        isEmpty: proxies?.isEmpty ?? true,
-        isSearching: false,
-        nullStatus: NullStatus(
-          label: appLocalizations.appProxiesEmpty,
-          illustration: NullStatusIllustration.data,
-        ),
-        child: PrismListView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            context.contentTopPadding,
-            16,
-            24 + context.bottomInset,
+      body: Builder(
+        builder: (context) => NullStatusSwitcher(
+          isLoading: proxies == null,
+          isEmpty: proxies?.isEmpty ?? true,
+          isSearching: false,
+          nullStatus: NullStatus(
+            label: appLocalizations.appProxiesEmpty,
+            illustration: NullStatusIllustration.data,
           ),
-          itemCount: proxies?.length ?? 0,
-          itemBuilder: (_, index) {
-            final proxy = proxies![index];
-            return ItemPositionProvider(
-              key: ValueKey(proxy.id),
-              position: ItemPosition.get(index, proxies.length),
-              child: _ProxyDialerItem(
-                profileId: profileId,
-                proxy: proxy,
-                onPressed: () => _handleSelect(context, ref, proxy),
-              ),
-            );
-          },
+          child: PrismListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              context.contentTopPadding,
+              16,
+              24 + context.bottomInset,
+            ),
+            itemCount: proxies?.length ?? 0,
+            itemBuilder: (_, index) {
+              final proxy = proxies![index];
+              return ItemPositionProvider(
+                key: ValueKey(proxy.id),
+                position: ItemPosition.get(index, proxies.length),
+                child: _ProxyDialerItem(
+                  profileId: profileId,
+                  proxy: proxy,
+                  onPressed: () => _handleSelect(context, ref, proxy),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

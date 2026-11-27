@@ -85,6 +85,9 @@ class ConnectionRows extends ChangeNotifier implements MinuteRows<String> {
 
   int get shownCount => _shown.length;
 
+  Iterable<TrackerInfo> get shown =>
+      _shown.reversed.map((held) => infoOf(held.info.id));
+
   int countOf(ConnectionStatus status) => switch (status) {
     ConnectionStatus.all => _held.length,
     ConnectionStatus.active => _active,

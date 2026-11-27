@@ -14,6 +14,8 @@ const _allowed = {
   'lib/features/editor/completion_popup.dart',
   // Nor a drag along the proxies group chips, which run across the sheet.
   'lib/views/proxies/group_tabs.dart',
+  // Table columns scroll horizontally, independently of a sheet's height.
+  'lib/views/connection/requests_table.dart',
 };
 
 int _lineOf(String source, int offset) =>
@@ -29,7 +31,7 @@ void main() {
           entity.path.contains('/generated/')) {
         continue;
       }
-      final path = p.relative(entity.path);
+      final path = p.posix.joinAll(p.split(p.relative(entity.path)));
       if (_allowed.contains(path)) {
         continue;
       }

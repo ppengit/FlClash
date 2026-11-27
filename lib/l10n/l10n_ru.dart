@@ -865,6 +865,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get columns => 'Столбцы';
 
   @override
+  String get visibleColumns => 'Видимые столбцы';
+
+  @override
+  String get groupByProcess => 'Группировать по процессам';
+
+  @override
+  String get expandAll => 'Развернуть всё';
+
+  @override
+  String get collapseAll => 'Свернуть всё';
+
+  @override
+  String get downloadSpeed => 'Скорость загрузки';
+
+  @override
+  String get uploadSpeed => 'Скорость отдачи';
+
+  @override
   String get proxyGroup => 'Группа прокси';
 
   @override

@@ -7,6 +7,7 @@ import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/core/method.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/state.dart';
@@ -26,6 +27,30 @@ import '../plugins/code_forge/support.dart' show initEditorNative;
 import '../helpers/host_scaffold.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
+
+class _ProbeFile extends Fake implements File {
+  final existsResult = Completer<bool>();
+  final List<int> head;
+
+  _ProbeFile(this.head);
+
+  @override
+  Future<bool> exists() => existsResult.future;
+
+  @override
+  Stream<List<int>> openRead([int? start, int? end]) => Stream.value(head);
+}
+
+class _ProbeActions extends ClashProvidersAction {
+  final probed = <ExternalProvider>[];
+  final pending = <String, Completer<ClashProvider?>>{};
+
+  @override
+  Future<ClashProvider?> remoteProviderOf(ExternalProvider external) {
+    probed.add(external);
+    return pending[external.path]?.future ?? Future.value(null);
+  }
+}
 
 class _ProvidersSection extends ConsumerWidget {
   const _ProvidersSection();
@@ -76,6 +101,8 @@ void main() {
 
   setUp(() => reset(core));
 
+  tearDown(() => ProviderItem.fileForProbe = File.new);
+
   tearDownAll(() {
     if (home.existsSync()) home.deleteSync(recursive: true);
   });
@@ -86,8 +113,9 @@ void main() {
 
   ProviderContainer containerFor(
     WidgetTester tester,
-    List<ExternalProvider> providers,
-  ) {
+    List<ExternalProvider> providers, {
+    ClashProvidersAction? probeActions,
+  }) {
     const size = Size(1400, 1000);
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -97,6 +125,8 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+        if (probeActions != null)
+          clashProvidersActionProvider.overrideWith(() => probeActions),
       ],
     );
     addTearDown(container.dispose);
@@ -590,6 +620,176 @@ void main() {
 
     await openMenu(tester, 'without-file');
     expect(find.text(l10n.edit), findsNothing);
+  });
+
+  testWidgets('reverse file probes keep the latest provider capabilities', (
+    tester,
+  ) async {
+    final older = _ProbeFile([0x28, 0xB5, 0x2F, 0xFD]);
+    final newer = _ProbeFile([0]);
+    final previous = _provider(
+      'reused',
+      type: 'Rule',
+      vehicleType: 'File',
+      path: join(home.path, 'older.mrs'),
+    );
+    final latest = previous.copyWith(path: join(home.path, 'newer.bin'));
+    final files = {previous.path: older, latest.path: newer};
+    ProviderItem.fileForProbe = (path) => files[path]!;
+    final actions = _ProbeActions();
+    final container = containerFor(tester, [previous], probeActions: actions);
+    await pump(tester, container);
+    final row = tester.state(find.byType(ProviderItem));
+
+    container.read(providersProvider.notifier).value = [latest];
+    await tester.pump();
+    expect(tester.state(find.byType(ProviderItem)), same(row));
+    newer.existsResult.complete(true);
+    await tester.pumpAndSettle();
+    await openMenu(tester, 'reused');
+    final l10n = currentAppLocalizations;
+    expect(find.text(l10n.edit), findsNothing);
+    expect(find.text(l10n.preview), findsNothing);
+    expect(find.text(l10n.sync), findsNothing);
+    await closeMenu(tester);
+
+    older.existsResult.complete(true);
+    await tester.pumpAndSettle();
+    await openMenu(tester, 'reused');
+    expect(find.text(l10n.edit), findsNothing);
+    expect(find.text(l10n.preview), findsNothing);
+    expect(find.text(l10n.sync), findsNothing);
+    expect(actions.probed, [latest]);
+    expect(
+      tester
+          .widget<DecorationListItem>(find.byType(DecorationListItem))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a replacement disables cached capabilities while probing', (
+    tester,
+  ) async {
+    final previous = _provider(
+      'reused',
+      type: 'Rule',
+      vehicleType: 'File',
+      path: join(home.path, 'cached.yaml'),
+    );
+    final latest = previous.copyWith(path: join(home.path, 'pending.bin'));
+    final cached = _ProbeFile([])..existsResult.complete(true);
+    final pending = _ProbeFile([0]);
+    final files = {previous.path: cached, latest.path: pending};
+    ProviderItem.fileForProbe = (path) => files[path]!;
+    final actions = _ProbeActions()
+      ..pending[previous.path!] = (Completer<ClashProvider?>()
+        ..complete(const ClashProvider(id: 1, label: 'cached')));
+    final container = containerFor(tester, [previous], probeActions: actions);
+    await pump(tester, container);
+    final l10n = currentAppLocalizations;
+    await openMenu(tester, 'reused');
+    expect(find.text(l10n.edit), findsOneWidget);
+    expect(find.text(l10n.sync), findsOneWidget);
+    await closeMenu(tester);
+
+    container.read(providersProvider.notifier).value = [latest];
+    await tester.pump();
+    expect(
+      tester
+          .widget<DecorationListItem>(find.byType(DecorationListItem))
+          .onPressed,
+      isNull,
+    );
+    await openMenu(tester, 'reused');
+    expect(find.text(l10n.edit), findsNothing);
+    expect(find.text(l10n.preview), findsNothing);
+    expect(find.text(l10n.sync), findsNothing);
+    await closeMenu(tester);
+    pending.existsResult.complete(true);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reverse rule set lookups keep the latest sync capability', (
+    tester,
+  ) async {
+    final older = _ProbeFile([]);
+    final newer = _ProbeFile([0]);
+    final previous = _provider(
+      'reused',
+      type: 'Rule',
+      vehicleType: 'File',
+      path: join(home.path, 'older.yaml'),
+    );
+    final latest = previous.copyWith(path: join(home.path, 'newer.bin'));
+    final files = {previous.path: older, latest.path: newer};
+    ProviderItem.fileForProbe = (path) => files[path]!;
+    final olderLookup = Completer<ClashProvider?>();
+    final newerLookup = Completer<ClashProvider?>();
+    final actions = _ProbeActions()
+      ..pending[previous.path!] = olderLookup
+      ..pending[latest.path!] = newerLookup;
+    final container = containerFor(tester, [previous], probeActions: actions);
+    await pump(tester, container);
+    older.existsResult.complete(true);
+    await tester.pump();
+    expect(actions.probed, [previous]);
+
+    container.read(providersProvider.notifier).value = [latest];
+    await tester.pump();
+    newer.existsResult.complete(true);
+    await tester.pump();
+    expect(actions.probed, [previous, latest]);
+    newerLookup.complete(null);
+    await tester.pumpAndSettle();
+    olderLookup.complete(
+      const ClashProvider(
+        id: 1,
+        label: 'old',
+        url: 'https://example.com/rules',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await openMenu(tester, 'reused');
+    final l10n = currentAppLocalizations;
+    expect(find.text(l10n.edit), findsNothing);
+    expect(find.text(l10n.preview), findsNothing);
+    expect(find.text(l10n.sync), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('disposed rows ignore pending file and rule set probes', (
+    tester,
+  ) async {
+    for (final disposeDuringLookup in [false, true]) {
+      final file = _ProbeFile([]);
+      ProviderItem.fileForProbe = (_) => file;
+      final provider = _provider(
+        'disposed',
+        type: 'Rule',
+        vehicleType: 'File',
+        path: join(home.path, 'disposed.yaml'),
+      );
+      final lookup = Completer<ClashProvider?>();
+      final actions = _ProbeActions()..pending[provider.path!] = lookup;
+      final container = containerFor(tester, [provider], probeActions: actions);
+      await pump(tester, container);
+      if (disposeDuringLookup) {
+        file.existsResult.complete(true);
+        await tester.pump();
+        expect(actions.probed, [provider]);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      if (!disposeDuringLookup) file.existsResult.complete(true);
+      lookup.complete(null);
+      await tester.pump();
+
+      expect(actions.probed, disposeDuringLookup ? [provider] : isEmpty);
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('the edit item opens the provider file and side-loads it', (

@@ -169,35 +169,37 @@ class _UserAgentsViewState extends ConsumerState<UserAgentsView> {
           icon: const GlyphIcon(AppGlyphs.addCircle),
         ),
       ],
-      body: PrismReorderableListView(
-        padding: context.listInsets
-            .page(top: 16, bottom: 16)
-            .copyWith(
-              top: context.contentTopPadding,
-              bottom: 16 + context.bottomInset,
+      body: Builder(
+        builder: (context) => PrismReorderableListView(
+          padding: context.listInsets
+              .page(top: 16, bottom: 16)
+              .copyWith(
+                top: context.contentTopPadding,
+                bottom: 16 + context.bottomInset,
+              ),
+          header: ItemPositionProvider(
+            position: ItemPosition.get(0, entries.length + 1),
+            child: _UserAgentItem(
+              label: appLocalizations.defaultText,
+              isSelected: selected == null,
+              onSelected: () {
+                _select(null);
+              },
             ),
-        header: ItemPositionProvider(
-          position: ItemPosition.get(0, entries.length + 1),
-          child: _UserAgentItem(
-            label: appLocalizations.defaultText,
-            isSelected: selected == null,
-            onSelected: () {
-              _select(null);
-            },
           ),
+          itemCount: entries.length,
+          itemBuilder: (_, index) => _buildItem(entries, index, selected),
+          proxyDecorator: (_, index, animation) {
+            return commonProxyDecorator(
+              _buildItem(entries, index, selected),
+              index,
+              animation,
+            );
+          },
+          onReorderItem: (oldIndex, newIndex) {
+            _save(entries.copyAndReorder(oldIndex, newIndex));
+          },
         ),
-        itemCount: entries.length,
-        itemBuilder: (_, index) => _buildItem(entries, index, selected),
-        proxyDecorator: (_, index, animation) {
-          return commonProxyDecorator(
-            _buildItem(entries, index, selected),
-            index,
-            animation,
-          );
-        },
-        onReorderItem: (oldIndex, newIndex) {
-          _save(entries.copyAndReorder(oldIndex, newIndex));
-        },
       ),
     );
   }

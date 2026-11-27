@@ -198,23 +198,25 @@ class _IconSetsViewState extends ConsumerState<IconSetsView> {
         label: appLocalizations.nullTip(appLocalizations.iconSets),
         illustration: NullStatusIllustration.icons,
       ),
-      child: PrismReorderableListView(
-        padding: context.listInsets
-            .page(top: 16, bottom: 16)
-            .copyWith(
-              top: context.contentTopPadding,
-              bottom: 16 + context.bottomInset,
-            ),
-        itemCount: iconSets.length,
-        itemBuilder: (_, index) => _buildItem(iconSets, index),
-        proxyDecorator: (_, index, animation) {
-          return commonProxyDecorator(
-            _buildItem(iconSets, index),
-            index,
-            animation,
-          );
-        },
-        onReorderItem: ref.read(iconSetsProvider.notifier).order,
+      child: Builder(
+        builder: (context) => PrismReorderableListView(
+          padding: context.listInsets
+              .page(top: 16, bottom: 16)
+              .copyWith(
+                top: context.contentTopPadding,
+                bottom: 16 + context.bottomInset,
+              ),
+          itemCount: iconSets.length,
+          itemBuilder: (_, index) => _buildItem(iconSets, index),
+          proxyDecorator: (_, index, animation) {
+            return commonProxyDecorator(
+              _buildItem(iconSets, index),
+              index,
+              animation,
+            );
+          },
+          onReorderItem: ref.read(iconSetsProvider.notifier).order,
+        ),
       ),
     );
   }

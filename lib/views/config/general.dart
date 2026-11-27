@@ -385,46 +385,48 @@ class GeneralView extends ConsumerWidget {
     );
     return BaseScaffold(
       title: appLocalizations.general,
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(
-            title: appLocalizations.startupAndBackground,
-            items: _startupItems(appLocalizations),
-            footer: appLocalizations.autoRunDesc,
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
           ),
-          generateSection(
-            title: appLocalizations.requests,
-            items: _requestItems(),
-            footer: appLocalizations.checkCertificateDesc,
-          ),
-          generateSection(
-            title: appLocalizations.inbound,
-            items: _inboundItems(
-              authentication: authentication,
-              externalController: externalController,
+          children: [
+            generateSection(
+              title: appLocalizations.startupAndBackground,
+              items: _startupItems(appLocalizations),
+              footer: appLocalizations.autoRunDesc,
             ),
-            footer: appLocalizations.externalControllerDesc,
-          ),
-          generateSection(
-            title: appLocalizations.connection,
-            items: _connectionItems(),
-          ),
-          OverrideSection(
-            title: appLocalizations.core,
-            spec: _generalOverrideSpec,
-            items: _coreItems(),
-          ),
-          generateSection(
-            title: appLocalizations.logsAndDiagnostics,
-            items: _logItems(),
-            footer: appLocalizations.logcatDesc,
-            last: true,
-          ),
-        ],
+            generateSection(
+              title: appLocalizations.requests,
+              items: _requestItems(),
+              footer: appLocalizations.checkCertificateDesc,
+            ),
+            generateSection(
+              title: appLocalizations.inbound,
+              items: _inboundItems(
+                authentication: authentication,
+                externalController: externalController,
+              ),
+              footer: appLocalizations.externalControllerDesc,
+            ),
+            generateSection(
+              title: appLocalizations.connection,
+              items: _connectionItems(),
+            ),
+            OverrideSection(
+              title: appLocalizations.core,
+              spec: _generalOverrideSpec,
+              items: _coreItems(),
+            ),
+            generateSection(
+              title: appLocalizations.logsAndDiagnostics,
+              items: _logItems(),
+              footer: appLocalizations.logcatDesc,
+              last: true,
+            ),
+          ],
+        ),
       ),
     );
   }

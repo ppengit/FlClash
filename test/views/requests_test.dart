@@ -12,9 +12,11 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/connection/requests.dart';
+import 'package:fl_clash/views/connection/requests_table.dart';
 import 'package:fl_clash/views/connection/requests_detail_pane.dart'
     show RequestsDetailPane;
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -110,6 +112,7 @@ void main() {
     Size size = _tableSize,
     Future<List<TrackerInfo>> Function()? connectionsReader,
     bool hotKeys = false,
+    ValueListenable<bool>? pageActive,
   }) async {
     container.read(viewSizeProvider.notifier).update((_) => size);
     tester.view.physicalSize = size;
@@ -117,8 +120,18 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    final view = RequestsView(connectionsReader: connectionsReader);
     final app = TestApp(
-      child: RequestsView(connectionsReader: connectionsReader),
+      child: pageActive == null
+          ? view
+          : ValueListenableBuilder(
+              valueListenable: pageActive,
+              builder: (_, active, child) => PageActivityScope(
+                isActive: active,
+                child: TickerMode(enabled: active, child: child!),
+              ),
+              child: view,
+            ),
     );
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -188,6 +201,18 @@ void main() {
               .isSelected ??
           false)
         (element.widget as TrackerInfoItem).trackerInfo.id,
+    for (final element in find.byType(RequestsTableRow).evaluate())
+      if (tester
+          .widget<PressSurface>(
+            find
+                .descendant(
+                  of: find.byWidget(element.widget),
+                  matching: find.byType(PressSurface),
+                )
+                .first,
+          )
+          .selected)
+        (element.widget as RequestsTableRow).id,
   ];
 
   Finder rowOf(String id) => find.byWidgetPredicate(
@@ -1465,6 +1490,95 @@ void main() {
     await teardownView(tester);
   });
 
+  testWidgets('switching a scrolled compact list to a table resumes arrivals '
+      'at the table head and retains its selected detail', (tester) async {
+    final live = [
+      for (var index = 0; index < 60; index++)
+        _tracker(id: '$index', host: 'host$index.test'),
+    ];
+    seedRequests(live);
+    await pumpRequests(tester, connectionsReader: () async => live);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ScrollToEndBox), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    final feed = tester.widget<RecordFeedView<String>>(
+      find.byType(RecordFeedView<String>),
+    );
+    final rows = feed.rows as ConnectionRows;
+    expect(rows.following, isFalse);
+    feed.onHover(true);
+    final selected = tester
+        .widget<TrackerInfoItem>(
+          find.byType(TrackerInfoItem).hitTestable().first,
+        )
+        .trackerInfo;
+    await tester.tap(targetOf(selected.metadata.host).hitTestable());
+    await tester.pumpAndSettle();
+
+    layoutMenu(tester).subItems.first.onPressed!();
+    await tester.pumpAndSettle();
+    final table = tester.widget<RequestsTable>(find.byType(RequestsTable));
+    expect(table.rows, same(rows));
+    expect(rows.following, isTrue);
+    expect(rows.holdsNew, isFalse);
+    expect(table.controller.offset, table.controller.position.minScrollExtent);
+    expect(
+      tester
+          .widget<TrackerSelection>(find.byType(TrackerSelection))
+          .selected
+          .value,
+      selected.id,
+    );
+    expect(
+      tester
+          .widget<TrackerInfoHeader>(find.byType(TrackerInfoHeader))
+          .trackerInfo
+          .id,
+      selected.id,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    final newest = _tracker(id: 'newest', host: 'newest.test');
+    live.add(newest);
+    addRequest(newest);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(rows.heldInfoOf('newest')?.metadata.host, newest.metadata.host);
+    expect(rows.following, isTrue);
+    expect(rows.holdsNew, isFalse);
+    expect(tester.takeException(), isNull);
+    await teardownView(tester);
+  });
+
+  testWidgets(
+    'switching a hovered compact list to a table releases waiting arrivals',
+    (tester) async {
+      seedRequests([_tracker(id: 'a', host: 'alpha.test')]);
+      await pumpRequests(tester);
+      await tester.pumpAndSettle();
+      final feed = tester.widget<RecordFeedView<String>>(
+        find.byType(RecordFeedView<String>),
+      );
+      final rows = feed.rows as ConnectionRows;
+      feed.onHover(true);
+      expect(rows.holdsNew, isTrue);
+      addRequest(_tracker(id: 'b', host: 'beta.test'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(rows.shownCount, 1);
+
+      layoutMenu(tester).subItems.first.onPressed!();
+      await tester.pumpAndSettle();
+      expect(find.byType(RequestsTable), findsOneWidget);
+      expect(rows.following, isTrue);
+      expect(rows.holdsNew, isFalse);
+      expect(rows.shownCount, 2);
+      expect(tester.takeException(), isNull);
+      await teardownView(tester);
+    },
+  );
+
   List<String> mockClipboard(WidgetTester tester) {
     final copied = <String>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -2046,6 +2160,112 @@ void main() {
     await teardownView(tester);
   });
 
+  for (final table in [false, true]) {
+    for (final background in [false, true]) {
+      testWidgets(
+        'request events wait while ${background ? 'backgrounded' : 'page inactive'} '
+        'and catch up before polling completes in ${table ? 'table' : 'cards'}',
+        (tester) async {
+          var live = [
+            for (var index = 0; index < 6; index++)
+              _tracker(id: 'a$index', host: 'a$index.test'),
+          ];
+          seedRequests(live);
+          container.listen(appSettingProvider, (_, _) {});
+          container
+              .read(appSettingProvider.notifier)
+              .update((state) => state.copyWith(requestsSplitView: !table));
+          final active = ValueNotifier(true);
+          addTearDown(active.dispose);
+          final resumedRead = Completer<List<TrackerInfo>>();
+          var holdRead = false;
+          var reads = 0;
+          await pumpRequests(
+            tester,
+            pageActive: active,
+            connectionsReader: () {
+              reads++;
+              return holdRead ? resumedRead.future : Future.value(live);
+            },
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('DNS').first);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Connections').first);
+          await tester.pumpAndSettle();
+          final rows = table
+              ? tester.widget<RequestsTable>(find.byType(RequestsTable)).rows
+              : tester
+                        .widget<RecordFeedView<String>>(
+                          find.byType(RecordFeedView<String>),
+                        )
+                        .rows
+                    as ConnectionRows;
+          if (background) {
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.paused,
+            );
+            addTearDown(
+              () => tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              ),
+            );
+          } else {
+            active.value = false;
+          }
+          await tester.pump();
+          await tester.pump();
+          var notifications = 0;
+          void countUpdate() => notifications++;
+          rows.addListener(countUpdate);
+          final hiddenBuilds = countHiddenSegmentBuilds();
+          final readsBefore = reads;
+          live = [
+            for (final info in live.skip(3)) info.copyWith(download: 2048),
+            _tracker(id: 'new', host: 'new.test'),
+          ];
+          container.read(requestsProvider.notifier)
+            ..close(['a0', 'a1', 'a2'])
+            ..updateTraffic({
+              for (final info in live)
+                info.id: (upload: 0, download: info.download),
+            });
+          addRequest(live.last);
+          for (var second = 0; second < 3; second++) {
+            await tester.pump(const Duration(seconds: 1));
+          }
+          expect(reads, readsBefore);
+          expect(notifications, 0);
+          expect(rows.shownCount, 6);
+          expect(rows.detailsOf('a3').download, 0);
+          expect(hiddenBuilds(), 0);
+
+          holdRead = true;
+          if (background) {
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+          } else {
+            active.value = true;
+          }
+          await tester.pump();
+          await tester.pumpAndSettle();
+          expect(reads, greaterThan(readsBefore));
+          expect(resumedRead.isCompleted, isFalse);
+          expect(rows.shownCount, 7);
+          expect(rows.heldInfoOf('new'), live.last);
+          expect(rows.infoOf('a3').download, 2048);
+          expect(rows.infoOf('a0').isActive, isFalse);
+          expect(notifications, greaterThan(0));
+          expect(tester.takeException(), isNull);
+          rows.removeListener(countUpdate);
+          resumedRead.complete(live);
+          await teardownView(tester);
+        },
+      );
+    }
+  }
+
   for (final (layout, size) in [
     ('phone list', _listSize),
     ('desktop list', _tableSize),
@@ -2230,6 +2450,49 @@ void main() {
 
     await teardownView(tester);
   });
+
+  testWidgets(
+    'the failed table retains merged repeat counts as requests arrive',
+    (tester) async {
+      seedRequests([
+        for (var index = 0; index < 3; index++)
+          _failed(id: 't$index', host: 'repeated.test', second: index),
+        _failed(id: 'other', host: 'other.test', second: 3),
+      ]);
+      container.listen(appSettingProvider, (_, _) {});
+      container
+          .read(appSettingProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              requestsSplitView: false,
+              requestsGroupByProcess: false,
+            ),
+          );
+      await pumpRequests(tester);
+      await pickStatus(tester, 'Failed 4');
+
+      expect(find.byType(RequestsTable), findsOneWidget);
+      expect(
+        tester
+            .widgetList<RequestsTableRow>(find.byType(RequestsTableRow))
+            .map((row) => row.id),
+        unorderedEquals(['other', 't2']),
+      );
+      expect(find.widgetWithText(TonalChip, '×3'), findsOneWidget);
+
+      addRequest(_failed(id: 't3', host: 'repeated.test', second: 4));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TonalChip, '×4'), findsOneWidget);
+      expect(find.widgetWithText(TonalChip, '×3'), findsNothing);
+
+      await pickStatus(tester, 'All 5');
+      expect(find.byType(RequestsTableRow), findsNWidgets(5));
+      expect(find.widgetWithText(TonalChip, '×4'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await teardownView(tester);
+    },
+  );
 
   testWidgets('settings that kept a grouping still load, and leave every '
       'width listed by minute', (tester) async {

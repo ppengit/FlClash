@@ -7,6 +7,8 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/dashboard/layout.dart';
 import 'package:fl_clash/views/dashboard/style.dart';
+import 'package:fl_clash/views/dashboard/widget_registry.dart';
+import 'package:fl_clash/views/dashboard/widgets/card.dart';
 import 'package:fl_clash/views/dashboard/widgets/profile_detail.dart';
 import 'package:fl_clash/views/dashboard/widgets/profiles.dart';
 import 'package:fl_clash/views/profiles/custom/custom.dart';
@@ -111,6 +113,7 @@ void main() {
     WidgetTester tester, {
     Widget card = const ProfilesCard(),
     double width = 360,
+    Locale locale = const Locale('en'),
   }) async {
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
@@ -120,6 +123,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: TestApp(
+          locale: locale,
           child: HostScaffold(
             body: Align(
               alignment: Alignment.topLeft,
@@ -155,6 +159,47 @@ void main() {
     expect(find.text('Add profile'), findsOneWidget);
     expect(find.byTooltip('Switch profile'), findsNothing);
   });
+
+  for (final type in ProfileType.values) {
+    testWidgets('Chinese ${type.name} card shares the management label but '
+        'keeps file details distinct', (tester) async {
+      setUpProfiles([_profile(1, type: type)]);
+      await pumpCard(
+        tester,
+        locale: const Locale('zh'),
+        card: const DashboardDensityScope(
+          density: DashboardDensity.standard,
+          scale: 1,
+          child: SizedBox(height: 176, child: ProfilesCard()),
+        ),
+        width: 300,
+      );
+
+      final context = tester.element(find.byType(ProfilesCard));
+      final appLocalizations = context.appLocalizations;
+      expect(find.text('订阅'), findsOneWidget);
+      expect(PageLabel.profiles.label, '订阅');
+      expect(DashboardWidget.profiles.label(context), '订阅');
+      expect(
+        tester.widget<DashboardCard>(find.byType(DashboardCard)).semanticLabel,
+        '订阅',
+      );
+      expect(find.byTooltip(appLocalizations.details('配置文件')), findsOneWidget);
+      expect(
+        find.text(switch (type) {
+          ProfileType.url => appLocalizations.remote,
+          ProfileType.file => appLocalizations.local,
+          ProfileType.custom => appLocalizations.custom,
+        }),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip(appLocalizations.update),
+        type == ProfileType.url ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('shows the current profile, its usage and when it ends', (
     tester,

@@ -306,29 +306,31 @@ class _CustomProfileViewState extends ConsumerState<CustomProfileView> {
               ),
             ),
           ],
-          body: NullStatusSwitcher(
-            isLoading: !_loaded,
-            child: ScrollConfiguration(
-              behavior: const ShowBarScrollBehavior(),
-              child: ArrivalCacheExtentBuilder(
-                builder: (cacheExtent) => CustomScrollView(
-                  scrollCacheExtent: cacheExtent,
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: SizedBox(height: context.sectionsTopPadding),
-                    ),
-                    SliverPadding(
-                      padding: context.listInsets.page().copyWith(
-                        bottom: 24 + context.bottomInset,
+          body: Builder(
+            builder: (context) => NullStatusSwitcher(
+              isLoading: !_loaded,
+              child: ScrollConfiguration(
+                behavior: const ShowBarScrollBehavior(),
+                child: ArrivalCacheExtentBuilder(
+                  builder: (cacheExtent) => CustomScrollView(
+                    scrollCacheExtent: cacheExtent,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: SizedBox(height: context.sectionsTopPadding),
                       ),
-                      sliver: SliverMainAxisGroup(
-                        slivers: [
-                          SliverToBoxAdapter(child: _overview),
-                          NextFrame.sliver(child: _groups),
-                        ],
+                      SliverPadding(
+                        padding: context.listInsets.page().copyWith(
+                          bottom: 24 + context.bottomInset,
+                        ),
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            SliverToBoxAdapter(child: _overview),
+                            NextFrame.sliver(child: _groups),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -521,66 +523,68 @@ class _MoreSectionsView extends ConsumerWidget {
     );
     return Scaffold(
       title: appLocalizations.more,
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(
-            items: [
-              _sectionRow(
-                context,
-                AppGlyphs.link,
-                appLocalizations.dialerProxy,
-                Text(
-                  dialerCount > 0
-                      ? appLocalizations.proxiesCount(
-                          dialerCount,
-                          dialerCount.compact,
-                        )
-                      : appLocalizations.none,
-                  style: hasDialerIssues
-                      ? TextStyle(color: context.colorScheme.error)
-                      : null,
-                ),
-                CustomProxyDialersView(profileId),
-              ),
-              _sectionRow(
-                context,
-                AppGlyphs.clock,
-                'NTP',
-                Text(
-                  _enabledText(appLocalizations, status.ntp),
-                  style: hasNtpIssues
-                      ? TextStyle(color: context.colorScheme.error)
-                      : null,
-                ),
-                NtpView(profileId),
-              ),
-              _sectionRow(
-                context,
-                AppGlyphs.eye,
-                appLocalizations.sniffer,
-                Text(_enabledText(appLocalizations, status.sniffer)),
-                SnifferView(profileId),
-              ),
-              if (showsTun)
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
+          ),
+          children: [
+            generateSection(
+              items: [
                 _sectionRow(
                   context,
-                  AppGlyphs.vpn,
-                  appLocalizations.tun,
+                  AppGlyphs.link,
+                  appLocalizations.dialerProxy,
                   Text(
-                    status.tunSettings > 0
-                        ? appLocalizations.settingsCount(status.tunSettings)
-                        : appLocalizations.defaultText,
+                    dialerCount > 0
+                        ? appLocalizations.proxiesCount(
+                            dialerCount,
+                            dialerCount.compact,
+                          )
+                        : appLocalizations.none,
+                    style: hasDialerIssues
+                        ? TextStyle(color: context.colorScheme.error)
+                        : null,
                   ),
-                  TunView(profileId),
+                  CustomProxyDialersView(profileId),
                 ),
-            ],
-          ),
-          ExitsSection(profileId, modulesOnly: true),
-        ],
+                _sectionRow(
+                  context,
+                  AppGlyphs.clock,
+                  'NTP',
+                  Text(
+                    _enabledText(appLocalizations, status.ntp),
+                    style: hasNtpIssues
+                        ? TextStyle(color: context.colorScheme.error)
+                        : null,
+                  ),
+                  NtpView(profileId),
+                ),
+                _sectionRow(
+                  context,
+                  AppGlyphs.eye,
+                  appLocalizations.sniffer,
+                  Text(_enabledText(appLocalizations, status.sniffer)),
+                  SnifferView(profileId),
+                ),
+                if (showsTun)
+                  _sectionRow(
+                    context,
+                    AppGlyphs.vpn,
+                    appLocalizations.tun,
+                    Text(
+                      status.tunSettings > 0
+                          ? appLocalizations.settingsCount(status.tunSettings)
+                          : appLocalizations.defaultText,
+                    ),
+                    TunView(profileId),
+                  ),
+              ],
+            ),
+            ExitsSection(profileId, modulesOnly: true),
+          ],
+        ),
       ),
     );
   }

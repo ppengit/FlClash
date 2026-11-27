@@ -804,7 +804,8 @@ class ScaffoldState extends State<Scaffold>
         form.pop == null &&
         isMobileView &&
         ModalRoute.of(context)?.impliesAppBarDismissal == true;
-    final compactTitle = isCompact || pushed;
+    final compactTitle =
+        isCompact || pushed || ancestors.isNotEmpty && _breadcrumbEntry != null;
     final titleEndInset = appBarActionInset(
       context,
       isCompactBar(context, isMobileView),
@@ -936,20 +937,25 @@ class ScaffoldState extends State<Scaffold>
             identical(entry.route.navigator, route?.navigator))
           entry,
     ];
+    final breadcrumbClearance = ancestors.isEmpty || _breadcrumbEntry == null
+        ? null
+        : const SizedBox(height: appBarContentGap);
     final scaffold = PrismScaffold(
       bar: _buildAppBar(backAction, form, ancestors),
       body: SortModeScope(sorting: _sorting, child: widget.body),
       headerListenable: keywords,
-      headerBuilder: header != null
-          ? (_) => header
-          : keywords == null
-          ? null
-          : (_) => keywords.value.isEmpty
-                ? null
-                : Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 16),
-                    child: _buildKeywords(keywords.value),
-                  ),
+      headerBuilder: (_) {
+        if (header != null) {
+          return header;
+        }
+        if (keywords == null || keywords.value.isEmpty) {
+          return breadcrumbClearance;
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 16),
+          child: _buildKeywords(keywords.value),
+        );
+      },
       foot: docked == null ? null : _buildDockedSearch(docked),
       footHidden: _sorting,
       footInset: BottomInsetScope.dockedSearchInset,

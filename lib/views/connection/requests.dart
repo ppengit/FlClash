@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'connection_poller.dart';
 import 'http_capture.dart';
 import 'requests_detail_pane.dart';
+import 'requests_table.dart';
 
 export 'requests_detail_pane.dart' show RequestsSegment;
 
@@ -50,6 +51,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
         ActivePollingMixin<RequestsView>,
         RouteMotionHoldMixin<RequestsView> {
   final _rows = ConnectionRows();
+  final _expandedProcesses = <String>{};
   var _query = '';
   var _rowsQuery = '';
   final _filters = connectionFilters();
@@ -77,6 +79,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
 
   /// Whether the detail stands beside the list rather than in a sheet.
   var _split = false;
+  var _table = false;
   late final _menuActions = TrackerMenuActions(
     close: _closeConnection,
     onlyApp: _onlyApp,
@@ -116,7 +119,6 @@ class _RequestsViewState extends ConsumerState<RequestsView>
       _,
       _,
     ) {
-      _dropGone();
       _scheduleRefresh();
     });
     ref.listenManual(patchClashConfigProvider.select(httpCapturing), (
@@ -211,6 +213,10 @@ class _RequestsViewState extends ConsumerState<RequestsView>
 
   @override
   Future<void> poll(PollGuard isCurrent) async {
+    if (_segment == RequestsSegment.connections &&
+        _behind.contains(RequestsSegment.connections)) {
+      updateWhenRouteSettled(_refreshConnections);
+    }
     await Future.wait([
       _readConnections(),
       if (_segment == RequestsSegment.http) _readHttp(),
@@ -253,18 +259,29 @@ class _RequestsViewState extends ConsumerState<RequestsView>
   );
 
   void _scheduleRefresh() {
+    if (!canPoll || _segment != RequestsSegment.connections) {
+      _behind.add(RequestsSegment.connections);
+      return;
+    }
     throttler.call(_refreshTag, () {
       if (!mounted) {
         return;
       }
-      updateWhenRouteSettled(() {
-        if (_segment != RequestsSegment.connections) {
-          _behind.add(RequestsSegment.connections);
-          return;
-        }
-        _rows.update(ref.read(requestsProvider));
-      });
+      updateWhenRouteSettled(_refreshConnections);
     }, duration: renderThrottleDuration);
+  }
+
+  void _refreshConnections() {
+    if (!canPoll || _segment != RequestsSegment.connections) {
+      _behind.add(RequestsSegment.connections);
+      return;
+    }
+    final log = ref.read(requestsProvider);
+    if (_behind.remove(RequestsSegment.connections)) {
+      _rows.catchUp(log);
+    } else {
+      _rows.update(log);
+    }
   }
 
   void _follow() => _rows.follow(ref.read(requestsProvider));
@@ -308,7 +325,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     }
     setState(() => _segment = segment);
     _searchShown();
-    final behind = _behind.remove(segment);
+    final behind = canPoll && _behind.remove(segment);
     switch (segment) {
       case RequestsSegment.connections when behind:
         _rows.catchUp(ref.read(requestsProvider));
@@ -554,6 +571,10 @@ class _RequestsViewState extends ConsumerState<RequestsView>
           ),
         ],
       },
+      if (!ViewScope.isMobileOf(context) &&
+          !requestsSplitView &&
+          _segment == RequestsSegment.connections)
+        ...requestsTableMenuItems(context, ref),
       if (!ViewScope.isMobileOf(context))
         PopupMenuItem(
           glyph: AppGlyphs.dashboard,
@@ -656,7 +677,10 @@ class _RequestsViewState extends ConsumerState<RequestsView>
           onFilter: _filters.add,
           child: ListenableBuilder(
             listenable: _rows,
-            builder: (context, _) => _buildBody(context, scrollController),
+            builder: (context, _) => TrackerRepeats(
+              counts: _rows.repeats,
+              child: _buildBody(context, scrollController),
+            ),
           ),
         ),
       ),
@@ -827,31 +851,77 @@ class _RequestsViewState extends ConsumerState<RequestsView>
   }
 
   Widget _buildBody(BuildContext context, ScrollController scrollController) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final split = ref.watch(
+          appSettingProvider.select((state) => state.requestsSplitView),
+        );
+        return WidthBuilder(
+          builder: (context, width) {
+            final table =
+                !split && !ViewScope.isMobileOf(context) && width >= 640;
+            if (_table != table) {
+              _table = table;
+              if (table) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted || !_table) {
+                    return;
+                  }
+                  _rows.hovered = false;
+                  if (!_rows.following) {
+                    _follow();
+                  }
+                  if (scrollController.hasClients) {
+                    scrollController.jumpTo(
+                      scrollController.position.minScrollExtent,
+                    );
+                  }
+                });
+              }
+            }
+            if (table) {
+              return RequestsTable(
+                rows: _rows,
+                controller: scrollController,
+                expanded: _expandedProcesses,
+                isSearching:
+                    SearchQuery(_query).isNotEmpty ||
+                    _filters.narrowsPastStatus,
+                emptyLabel: _filters.status.emptyLabel(
+                  context.appLocalizations,
+                ),
+                detailTitle: _detailTitleOf(context),
+              );
+            }
+            return _buildCards(context, scrollController);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCards(BuildContext context, ScrollController scrollController) {
     final appLocalizations = context.appLocalizations;
-    return TrackerRepeats(
-      counts: _rows.repeats,
-      child: RecordFeedView<String>(
-        rows: _rows,
-        isEmpty: _rows.shownCount == 0,
-        isSearching:
-            SearchQuery(_query).isNotEmpty || _filters.narrowsPastStatus,
-        nullStatus: NullStatus(
-          label: _filters.status.emptyLabel(appLocalizations),
-          illustration: NullStatusIllustration.connections,
-        ),
-        controller: scrollController,
-        timeAt: (fraction) => _rows.atFraction(fraction)?.start,
-        following: _rows.following,
-        onStopFollowing: () => _rows.following = false,
-        onFollow: _follow,
-        onHover: (hovered) => _rows.hovered = hovered,
-        itemBuilder: trackerInfoRows(
-          _rows,
-          detailTitle: _detailTitleOf(context),
-          onClose: _closeConnection,
-        ),
-        addAutomaticKeepAlives: false,
+    return RecordFeedView<String>(
+      rows: _rows,
+      isEmpty: _rows.shownCount == 0,
+      isSearching: SearchQuery(_query).isNotEmpty || _filters.narrowsPastStatus,
+      nullStatus: NullStatus(
+        label: _filters.status.emptyLabel(appLocalizations),
+        illustration: NullStatusIllustration.connections,
       ),
+      controller: scrollController,
+      timeAt: (fraction) => _rows.atFraction(fraction)?.start,
+      following: _rows.following,
+      onStopFollowing: () => _rows.following = false,
+      onFollow: _follow,
+      onHover: (hovered) => _rows.hovered = hovered,
+      itemBuilder: trackerInfoRows(
+        _rows,
+        detailTitle: _detailTitleOf(context),
+        onClose: _closeConnection,
+      ),
+      addAutomaticKeepAlives: false,
     );
   }
 }

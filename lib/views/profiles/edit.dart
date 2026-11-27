@@ -187,12 +187,18 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
   }
 
   Future<void> _handleSaveEdit(BuildContext context, Uint8List data) async {
-    final issue = await globalState.safeRun(
-      () => ref
-          .read(profilesActionProvider.notifier)
-          .validateConfigWithData(data),
+    final validation = await globalState.safeRun(
+      () async => (
+        issue: await ref
+            .read(profilesActionProvider.notifier)
+            .validateConfigWithData(data),
+      ),
       silence: false,
     );
+    if (validation == null) {
+      return;
+    }
+    final issue = validation.issue;
     if (issue != null) {
       unawaited(
         dialogs.showAlert(
@@ -211,11 +217,11 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     final title = widget.profile.label.takeFirstValid([
       widget.profile.id.toString(),
     ]);
-    final editedData = _editedData;
+    final pendingData = _fileData ?? _editedData;
     final editorPage = EditorPage(
       title: title,
-      load: () async => editedData != null
-          ? CodeForgeDocument.fromUtf8(editedData)
+      load: () async => pendingData != null
+          ? CodeForgeDocument.fromUtf8(pendingData)
           : openEditorFile(
               await appPath.getProfilePath(widget.profile.id.toString()),
             ),

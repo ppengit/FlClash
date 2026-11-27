@@ -71,11 +71,19 @@ class _TurningOff extends MitmModulesAction {
 /// Takes new values without reading the module file, which a widget test
 /// cannot reach.
 class _SavingArguments extends MitmModulesAction {
+  _SavingArguments({this.firstSave});
+
+  final Completer<void>? firstSave;
+  var calls = 0;
+
   @override
   Future<MitmModule?> setArguments(
     MitmModule module,
     Map<String, String> arguments,
   ) async {
+    if (++calls == 1) {
+      await firstSave?.future;
+    }
     final changed = module.copyWith(arguments: arguments);
     putModule(changed);
     return changed;
@@ -616,6 +624,180 @@ void main() {
 
     expect((await stored()).first.arguments, {'Toggle': 'false'});
   });
+
+  for (final fails in [false, true]) {
+    final outcome = fails ? 'fails' : 'succeeds';
+    testWidgets('argument edits stay disabled until a save $outcome', (
+      tester,
+    ) async {
+      final firstSave = Completer<void>();
+      final action = _SavingArguments(firstSave: firstSave);
+      await pump(
+        tester,
+        MitmModuleView(id: _remote.id),
+        action: () => action,
+        remoteContent: MitmModuleContent(
+          arguments: const [
+            MitmModuleArgument(
+              name: 'First',
+              defaultValue: 'true',
+              type: MitmModuleArgumentType.toggle,
+            ),
+            MitmModuleArgument(
+              name: 'Second',
+              defaultValue: 'false',
+              type: MitmModuleArgumentType.toggle,
+            ),
+            MitmModuleArgument(
+              name: 'Choice',
+              defaultValue: 'one',
+              type: MitmModuleArgumentType.select,
+              options: ['one', 'two'],
+            ),
+            MitmModuleArgument(name: 'Text', defaultValue: 'kept'),
+          ],
+        ),
+      );
+      const prior = {'Text': 'kept'};
+      container
+          .read(mitmModulesActionProvider.notifier)
+          .putModule(_remote.copyWith(arguments: prior));
+      await tester.pumpAndSettle();
+      Switch toggle(String title) => tester.widget<Switch>(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text(title),
+            matching: find.byType(DecorationListItem),
+          ),
+          matching: find.byType(Switch),
+        ),
+      );
+      final secondChanged = toggle('Second').onChanged!;
+
+      await tester.tap(find.text('First'));
+      secondChanged(true);
+      expect(action.calls, 1);
+      await tester.pumpAndSettle();
+
+      expect(toggle('First').onChanged, isNull);
+      expect(toggle('Second').onChanged, isNull);
+      for (final title in ['Second', 'Choice', 'Text']) {
+        expect(
+          tester
+              .widget<AbsorbPointer>(
+                find
+                    .ancestor(
+                      of: find.text(title),
+                      matching: find.byType(AbsorbPointer),
+                    )
+                    .first,
+              )
+              .absorbing,
+          isTrue,
+        );
+        expect(
+          tester
+              .widget<ExcludeFocus>(
+                find
+                    .ancestor(
+                      of: find.text(title),
+                      matching: find.byType(ExcludeFocus),
+                    )
+                    .first,
+              )
+              .excluding,
+          isTrue,
+        );
+        await tester.tap(find.text(title), warnIfMissed: false);
+        await tester.pumpAndSettle();
+      }
+      expect(action.calls, 1);
+      expect(find.byType(EditableText), findsNothing);
+      expect(find.text('two'), findsNothing);
+      expect((await stored()).first.arguments, prior);
+
+      if (fails) {
+        firstSave.completeError(StateError('argument save failed'));
+      } else {
+        firstSave.complete();
+      }
+      await tester.pumpAndSettle();
+      final saved = {...prior, if (!fails) 'First': 'false'};
+      expect((await stored()).first.arguments, saved);
+      expect(toggle('First').value, fails);
+      expect(toggle('First').onChanged, isNotNull);
+      expect(toggle('Second').onChanged, isNotNull);
+      if (fails) {
+        await tester.tap(find.text(currentAppLocalizations.confirm));
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.text('Second'));
+      await tester.pumpAndSettle();
+      expect(action.calls, 2);
+      expect((await stored()).first.arguments, {...saved, 'Second': 'true'});
+
+      await tester.tap(find.text('Choice'));
+      await tester.pumpAndSettle();
+      expect(find.text('two'), findsOneWidget);
+      await tester.tap(find.text('two'));
+      await tester.pumpAndSettle();
+      expect(action.calls, 3);
+      expect((await stored()).first.arguments, {
+        ...saved,
+        'Second': 'true',
+        'Choice': 'two',
+      });
+
+      await tester.tap(find.text('Text'));
+      await tester.pumpAndSettle();
+      expect(find.byType(EditableText), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an argument save that $outcome after disposal is safe', (
+      tester,
+    ) async {
+      final firstSave = Completer<void>();
+      final action = _SavingArguments(firstSave: firstSave);
+      await pump(tester, MitmModuleView(id: _remote.id), action: () => action);
+      container.listen(mitmModulesProvider, (_, _) {});
+      container
+          .read(mitmModulesActionProvider.notifier)
+          .putModule(_remote.copyWith(enabled: false, scripts: 1));
+      await tester.pumpAndSettle();
+      final changed = tester
+          .widget<Switch>(find.byType(Switch).last)
+          .onChanged!;
+      await tester.tap(find.text('Toggle'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TestApp(child: SizedBox()),
+        ),
+      );
+      changed(false);
+      expect(action.calls, 1);
+
+      if (fails) {
+        firstSave.completeError(StateError('argument save failed'));
+      } else {
+        firstSave.complete();
+      }
+      await tester.pumpAndSettle();
+
+      expect(
+        (await stored()).first.arguments,
+        fails ? isEmpty : {'Toggle': 'false'},
+      );
+      expect(
+        find.text(currentAppLocalizations.mitmModuleRiskTitle),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('only a local module is edited and takes attachments', (
     tester,

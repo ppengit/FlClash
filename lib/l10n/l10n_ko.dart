@@ -838,6 +838,24 @@ class AppLocalizationsKo extends AppLocalizations {
   String get columns => '열';
 
   @override
+  String get visibleColumns => '표시할 열';
+
+  @override
+  String get groupByProcess => '프로세스별 그룹화';
+
+  @override
+  String get expandAll => '모두 펼치기';
+
+  @override
+  String get collapseAll => '모두 접기';
+
+  @override
+  String get downloadSpeed => '다운로드 속도';
+
+  @override
+  String get uploadSpeed => '업로드 속도';
+
+  @override
   String get proxyGroup => '프록시 그룹';
 
   @override

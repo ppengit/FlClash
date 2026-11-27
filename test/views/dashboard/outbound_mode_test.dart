@@ -4,6 +4,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/dashboard/layout.dart';
+import 'package:fl_clash/views/dashboard/widgets/card.dart';
 import 'package:fl_clash/views/dashboard/widgets/outbound_mode.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/widgets.dart';
@@ -165,25 +166,63 @@ void main() {
     expect(swellOf(Mode.rule), moreOrLessEquals(1));
   });
 
-  testWidgets('the desktop bar fills its height and switches the mode', (
-    tester,
-  ) async {
-    await pump(
-      tester,
-      const DashboardDensityScope(
-        density: DashboardDensity.standard,
-        scale: 1,
-        child: SizedBox(height: 64, child: OutboundModeBar()),
-      ),
-      width: 600,
-    );
-    expect(tester.getSize(buttonOf(Mode.rule)).height, 64 - 8 * 2);
+  for (final direction in [TextDirection.ltr, TextDirection.rtl]) {
+    testWidgets('the desktop bar keeps its height and corners when selecting '
+        'modes in ${direction.name}', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await pump(
+          tester,
+          Directionality(
+            textDirection: direction,
+            child: const DashboardDensityScope(
+              density: DashboardDensity.standard,
+              scale: 1,
+              child: SizedBox(height: 64, child: OutboundModeBar()),
+            ),
+          ),
+          width: 600,
+        );
+        await tester.pumpAndSettle();
+        final colorScheme = Theme.of(
+          tester.element(find.byType(OutboundModeBar)),
+        ).colorScheme;
+        final radius = BorderRadius.circular(
+          dashboardCardRadius(DashboardDensity.standard) - 8,
+        );
 
-    await tester.tap(buttonOf(Mode.global));
-    await tester.pumpAndSettle();
-
-    expect(container.read(patchClashConfigProvider).mode, Mode.global);
-  });
+        for (final selected in Mode.values) {
+          await tester.tap(buttonOf(selected));
+          await tester.pumpAndSettle();
+          expect(container.read(patchClashConfigProvider).mode, selected);
+          for (final mode in Mode.values) {
+            expect(tester.getSize(buttonOf(mode)).height, 64 - 8 * 2);
+            final decoration = decorationOf(tester, mode);
+            expect(
+              (decoration.shape as RoundedSuperellipseBorder).borderRadius,
+              radius,
+            );
+            expect(
+              decoration.color,
+              mode == selected
+                  ? colorScheme.primary
+                  : isNot(colorScheme.primary),
+            );
+            final node = tester.getSemantics(buttonOf(mode));
+            expect(node.label, mode.label);
+            expect(node.flagsCollection.isButton, isTrue);
+            expect(node.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+            expect(
+              node.flagsCollection.isSelected.toBoolOrNull(),
+              mode == selected,
+            );
+          }
+        }
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
 
   testWidgets('large text on a narrow phone still fits', (tester) async {
     await pump(tester, const OutboundModeCard(), width: 300, textScale: 1.4);

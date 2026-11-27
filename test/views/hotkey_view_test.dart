@@ -273,6 +273,112 @@ void main() {
       expect(stored.single.modifiers, {KeyboardModifier.control});
     });
 
+    testWidgets(
+      'keyboard navigation saves the recorded chord without replacing it',
+      (tester) async {
+        final container = _containerFor(tester);
+        await _pumpRecorder(
+          tester,
+          container,
+          const HotKeyAction(action: HotAction.mode),
+        );
+        await _pressControlA(tester);
+        final save = currentAppLocalizations.save;
+        bool saveFocused() =>
+            Focus.of(tester.element(find.text(save))).hasFocus;
+        for (var i = 0; i < 6 && !saveFocused(); i++) {
+          await _press(tester, PhysicalKeyboardKey.tab, LogicalKeyboardKey.tab);
+        }
+        expect(saveFocused(), isTrue);
+        expect(_button(tester, save).onPressed, isNotNull);
+        await _press(
+          tester,
+          PhysicalKeyboardKey.enter,
+          LogicalKeyboardKey.enter,
+        );
+        expect(find.byType(HotKeyRecorder), findsNothing);
+        final stored = container.read(hotKeyActionsProvider).single;
+        expect(stored.key, _keyA);
+        expect(stored.modifiers, {KeyboardModifier.control});
+      },
+    );
+
+    testWidgets('Shift Tab navigates without changing the recorded chord', (
+      tester,
+    ) async {
+      final container = _containerFor(tester);
+      await _pumpRecorder(
+        tester,
+        container,
+        const HotKeyAction(action: HotAction.mode),
+      );
+      await _pressControlA(tester);
+      await _press(
+        tester,
+        PhysicalKeyboardKey.tab,
+        LogicalKeyboardKey.tab,
+        holding: const [
+          (PhysicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftLeft),
+        ],
+      );
+      expect(
+        _button(tester, currentAppLocalizations.save).onPressed,
+        isNotNull,
+      );
+      await tester.tap(find.text(currentAppLocalizations.save));
+      await tester.pumpAndSettle();
+      final stored = container.read(hotKeyActionsProvider).single;
+      expect(stored.key, _keyA);
+      expect(stored.modifiers, {KeyboardModifier.control});
+    });
+
+    testWidgets('modified navigation keys remain recordable bindings', (
+      tester,
+    ) async {
+      final container = _containerFor(tester);
+      await _pumpRecorder(
+        tester,
+        container,
+        const HotKeyAction(action: HotAction.mode),
+      );
+      await _press(
+        tester,
+        PhysicalKeyboardKey.tab,
+        LogicalKeyboardKey.tab,
+        holding: const [_control],
+      );
+      await tester.tap(find.text(currentAppLocalizations.save));
+      await tester.pumpAndSettle();
+      final stored = container.read(hotKeyActionsProvider).single;
+      expect(stored.key, PhysicalKeyboardKey.tab.usbHidUsage);
+      expect(stored.modifiers, {KeyboardModifier.control});
+    });
+
+    testWidgets(
+      'Shift Tab can still be recorded as the initial modified chord',
+      (tester) async {
+        final container = _containerFor(tester);
+        await _pumpRecorder(
+          tester,
+          container,
+          const HotKeyAction(action: HotAction.mode),
+        );
+        await _press(
+          tester,
+          PhysicalKeyboardKey.tab,
+          LogicalKeyboardKey.tab,
+          holding: const [
+            (PhysicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftLeft),
+          ],
+        );
+        await tester.tap(find.text(currentAppLocalizations.save));
+        await tester.pumpAndSettle();
+        final stored = container.read(hotKeyActionsProvider).single;
+        expect(stored.key, PhysicalKeyboardKey.tab.usbHidUsage);
+        expect(stored.modifiers, {KeyboardModifier.shift});
+      },
+    );
+
     testWidgets('a bare key cannot be saved and says why', (tester) async {
       final container = _containerFor(tester);
       await _pumpRecorder(

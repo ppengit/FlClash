@@ -244,38 +244,40 @@ class _SniffView extends ConsumerWidget {
     final ports = ref.watch(_sniffSelector((sniff) => sniff.ports));
     return BaseScaffold(
       title: overrideKey.label(appLocalizations),
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(
-            items: [
-              ConfigListEditItem(
-                title: (l) => l.ports,
-                subtitle: (l) => _portsText(l, ports),
-                selector: _sniffSelector((sniff) => sniff.ports),
-                onChanged: _sniffWriter(
-                  (sniff, value) => sniff.copyWith(ports: value),
-                ),
-                itemMaxLength: TextInputLimits.portRange,
-                itemValidator: validatePortRange,
-              ),
-              ConfigOptionsItem<_SniffDestination>(
-                title: (l) => l.overrideDestination,
-                options: _SniffDestination.values,
-                textBuilder: (value) => value.label(appLocalizations),
-                selector: _sniffSelector(
-                  (sniff) => _SniffDestination.of(sniff.overrideDest),
-                ),
-                onChanged: _sniffWriter(
-                  (sniff, value) => sniff.copyWith(overrideDest: value.value),
-                ),
-              ),
-            ],
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
           ),
-        ],
+          children: [
+            generateSection(
+              items: [
+                ConfigListEditItem(
+                  title: (l) => l.ports,
+                  subtitle: (l) => _portsText(l, ports),
+                  selector: _sniffSelector((sniff) => sniff.ports),
+                  onChanged: _sniffWriter(
+                    (sniff, value) => sniff.copyWith(ports: value),
+                  ),
+                  itemMaxLength: TextInputLimits.portRange,
+                  itemValidator: validatePortRange,
+                ),
+                ConfigOptionsItem<_SniffDestination>(
+                  title: (l) => l.overrideDestination,
+                  options: _SniffDestination.values,
+                  textBuilder: (value) => value.label(appLocalizations),
+                  selector: _sniffSelector(
+                    (sniff) => _SniffDestination.of(sniff.overrideDest),
+                  ),
+                  onChanged: _sniffWriter(
+                    (sniff, value) => sniff.copyWith(overrideDest: value.value),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

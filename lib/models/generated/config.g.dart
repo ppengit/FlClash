@@ -67,6 +67,24 @@ _AppSettingProps _$AppSettingPropsFromJson(
       defaultFilters,
   hideIp: json['hideIp'] as bool? ?? false,
   requestsSplitView: json['requestsSplitView'] as bool? ?? true,
+  requestsGroupByProcess: json['requestsGroupByProcess'] as bool? ?? true,
+  requestsColumns:
+      (json['requestsColumns'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [
+        'destination',
+        'network',
+        'rule',
+        'exit',
+        'download',
+        'upload',
+        'downloadSpeed',
+        'uploadSpeed',
+        'start',
+      ],
+  requestsSortColumn: json['requestsSortColumn'] as String?,
+  requestsSortDescending: json['requestsSortDescending'] as bool? ?? false,
   editorLineWrap: json['editorLineWrap'] as bool? ?? false,
   editorFontSize:
       $enumDecodeNullable(_$EditorFontSizeEnumMap, json['editorFontSize']) ??
@@ -124,6 +142,10 @@ Map<String, dynamic> _$AppSettingPropsToJson(_AppSettingProps instance) =>
       'filters': instance.filters,
       'hideIp': instance.hideIp,
       'requestsSplitView': instance.requestsSplitView,
+      'requestsGroupByProcess': instance.requestsGroupByProcess,
+      'requestsColumns': instance.requestsColumns,
+      'requestsSortColumn': instance.requestsSortColumn,
+      'requestsSortDescending': instance.requestsSortDescending,
       'editorLineWrap': instance.editorLineWrap,
       'editorFontSize': _$EditorFontSizeEnumMap[instance.editorFontSize]!,
       'serviceOrder': instance.serviceOrder,

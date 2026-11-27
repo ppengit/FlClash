@@ -153,114 +153,118 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     return Scaffold(
       isLoading: isLoading,
       title: appLocalizations.backupAndRestore,
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(
-            title: appLocalizations.remote,
-            items: [
-              if (dav == null)
-                ListItem(
-                  leading: const GlyphIcon(AppGlyphs.account),
-                  title: Text(appLocalizations.noInfo),
-                  subtitle: Text(appLocalizations.pleaseBindWebDAV),
-                  trailing: TonalButton(
-                    label: appLocalizations.bind,
-                    onPressed: () {
-                      _showAddWebDAV(dav);
-                    },
-                  ),
-                )
-              else ...[
-                ListItem(
-                  leading: const GlyphIcon(AppGlyphs.account),
-                  title: TooltipText(
-                    text: Text(
-                      dav.user,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
+          ),
+          children: [
+            generateSection(
+              title: appLocalizations.remote,
+              items: [
+                if (dav == null)
+                  ListItem(
+                    leading: const GlyphIcon(AppGlyphs.account),
+                    title: Text(appLocalizations.noInfo),
+                    subtitle: Text(appLocalizations.pleaseBindWebDAV),
+                    trailing: TonalButton(
+                      label: appLocalizations.bind,
+                      onPressed: () {
+                        _showAddWebDAV(dav);
+                      },
+                    ),
+                  )
+                else ...[
+                  ListItem(
+                    leading: const GlyphIcon(AppGlyphs.account),
+                    title: TooltipText(
+                      text: Text(
+                        dav.user,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(appLocalizations.connectivity),
+                          _DavConnectionIndicator(connection: _davConnection),
+                        ],
+                      ),
+                    ),
+                    trailing: TonalButton(
+                      label: appLocalizations.edit,
+                      onPressed: () {
+                        _showAddWebDAV(dav);
+                      },
                     ),
                   ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(appLocalizations.connectivity),
-                        _DavConnectionIndicator(connection: _davConnection),
-                      ],
-                    ),
-                  ),
-                  trailing: TonalButton(
-                    label: appLocalizations.edit,
-                    onPressed: () {
-                      _showAddWebDAV(dav);
+                  ListItem.input(
+                    title: Text(appLocalizations.file),
+                    subtitle: Text(dav.fileName),
+                    dialogTitle: appLocalizations.file,
+                    value: dav.fileName,
+                    resetValue: defaultDavFileName,
+                    maxLength: TextInputLimits.fileName,
+                    onChanged: (value) {
+                      _handleChange(value, ref);
                     },
                   ),
-                ),
-                ListItem.input(
-                  title: Text(appLocalizations.file),
-                  subtitle: Text(dav.fileName),
-                  dialogTitle: appLocalizations.file,
-                  value: dav.fileName,
-                  resetValue: defaultDavFileName,
-                  maxLength: TextInputLimits.fileName,
-                  onChanged: (value) {
-                    _handleChange(value, ref);
-                  },
-                ),
+                  ListItem(
+                    onTap: () {
+                      _backupOnWebDAV();
+                    },
+                    title: Text(appLocalizations.backup),
+                  ),
+                  ListItem(
+                    onTap: () {
+                      _restoreOnWebDAV();
+                    },
+                    title: Text(appLocalizations.restore),
+                  ),
+                ],
+              ],
+            ),
+            generateSection(
+              title: appLocalizations.local,
+              items: [
                 ListItem(
                   onTap: () {
-                    _backupOnWebDAV();
+                    _backupOnLocal();
                   },
                   title: Text(appLocalizations.backup),
                 ),
                 ListItem(
                   onTap: () {
-                    _restoreOnWebDAV();
+                    _restoreOnLocal();
                   },
                   title: Text(appLocalizations.restore),
                 ),
               ],
-            ],
-          ),
-          generateSection(
-            title: appLocalizations.local,
-            items: [
-              ListItem(
-                onTap: () {
-                  _backupOnLocal();
-                },
-                title: Text(appLocalizations.backup),
-              ),
-              ListItem(
-                onTap: () {
-                  _restoreOnLocal();
-                },
-                title: Text(appLocalizations.restore),
-              ),
-            ],
-          ),
-          generateSection(
-            title: appLocalizations.options,
-            items: [
-              ConfigOptionsItem<RestoreStrategy>(
-                title: (l) => l.restoreStrategy,
-                options: RestoreStrategy.values,
-                textBuilder: (strategy) => strategy.label,
-                selector: appSettingProvider.select(
-                  (state) => state.restoreStrategy,
+            ),
+            generateSection(
+              title: appLocalizations.options,
+              items: [
+                ConfigOptionsItem<RestoreStrategy>(
+                  title: (l) => l.restoreStrategy,
+                  options: RestoreStrategy.values,
+                  textBuilder: (strategy) => strategy.label,
+                  selector: appSettingProvider.select(
+                    (state) => state.restoreStrategy,
+                  ),
+                  onChanged: (ref, value) => ref
+                      .read(appSettingProvider.notifier)
+                      .update(
+                        (state) => state.copyWith(restoreStrategy: value),
+                      ),
                 ),
-                onChanged: (ref, value) => ref
-                    .read(appSettingProvider.notifier)
-                    .update((state) => state.copyWith(restoreStrategy: value)),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

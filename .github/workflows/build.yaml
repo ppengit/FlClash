@@ -812,15 +812,17 @@ jobs:
           {
             echo "# FlClash custom $version"
             echo
-            echo "Based on upstream v${version%%-custom.*}. Windows amd64 packages built from ${{ github.sha }} after the full repository check suite."
+            echo "基于上游 v${version%%-custom.*}，Windows amd64 安装包在完整仓库检查通过后由 ${{ github.sha }} 构建。"
             echo
             echo '<!-- flclash:changelog:begin -->'
-            echo '- 请求页恢复快捷筛选标签（如 TCP、规则类型等），点按即可筛选，再点取消。'
-            echo '- 所有切换类选项统一为圆角胶囊，未选中项不再出现内外圆角大小不一致。'
-            echo '- 页面顶部显示完整面包屑路径，可点击返回任意上级页面，并保留离开确认。'
-            echo '- 请求页可在“列表 / 列表与详情”间切换，选择在重启和切换配置后保留。'
-            echo '- 规则表单显示规则类型与分流策略的中文说明，并随类型显示填写示例。'
-            echo '- 规则作用范围使用“当前配置 / 所有配置”，自定义配置仍只使用自身规则。'
+            echo '- 请求页“列表”视图升级为按进程分组的树形表格：可展开折叠、按列头排序、自选显示列、拖动列宽，设置会持久保存。'
+            echo '- 请求页保留快捷筛选标签，继续支持右键添加规则与查看详情；窄屏和双栏布局仍使用紧凑卡片。'
+            echo '- 面包屑统一字号，修正滚动时内容被顶部遮挡，以及部分页面重复计算顶部留白。'
+            echo '- “配置”管理入口与添加、排序、切换、更新全部等操作改称“订阅”；本地文件仍称“配置文件”。'
+            echo '- 编辑器保存期间锁定输入、标题与撤销重做，避免保存过程中继续输入造成丢字。'
+            echo '- 切换订阅时恢复各自上次使用的策略组标签；改进代理文件探测，避免旧结果覆盖新文件的操作状态。'
+            echo '- MITM 模块参数连续修改不再互相覆盖；快捷键录制可用键盘导航并保存。'
+            echo '- 上传订阅文件后立即编辑会打开上传内容；校验异常不再被当成校验成功。'
             echo '<!-- flclash:changelog:end -->'
             echo
             echo '## Downloads'

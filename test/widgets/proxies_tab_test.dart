@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
@@ -32,6 +33,18 @@ class _TabStateNotifier extends Notifier<ProxiesTabState> {
   ProxiesTabState build() => _tabState([_group('B'), _group('C')]);
 
   void set(ProxiesTabState value) => state = value;
+}
+
+class _RecordingProxiesAction extends ProxiesAction {
+  final tested = <String>[];
+
+  @override
+  Future<void> delayTestPageGroup(
+    String groupName, {
+    bool matchSearch = true,
+  }) async {
+    tested.add(groupName);
+  }
 }
 
 void main() {
@@ -65,12 +78,13 @@ void main() {
   });
 
   Future<GlobalKey<ProxiesTabViewState>> pumpTabView(
-    WidgetTester tester,
-  ) async {
+    WidgetTester tester, {
+    ProviderContainer? container,
+  }) async {
     final key = GlobalKey<ProxiesTabViewState>();
     await tester.pumpWidget(
       UncontrolledProviderScope(
-        container: globalContainer,
+        container: container ?? globalContainer,
         child: TestApp(
           child: ProxiesTabView(key: key),
           homeBuilder: (child) => HostScaffold(body: child),
@@ -94,6 +108,63 @@ void main() {
     expect(globalContainer.read(currentProfileProvider)?.currentGroupName, 'C');
     expect(isTabSelected(tester, 'C'), isTrue);
     expect(isTabSelected(tester, 'B'), isFalse);
+  });
+
+  testWidgets('profile switches restore saved tabs with identical groups '
+      'without replacing the controller or delay target', (tester) async {
+    final first = Profile.normal().copyWith(currentGroupName: 'B');
+    final second = first.copyWith(id: first.id + 1, currentGroupName: 'A');
+    final actions = _RecordingProxiesAction();
+    final container = ProviderContainer(
+      overrides: [
+        currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+        profilesProvider.overrideWith(() => TestProfiles([first, second])),
+        currentGroupsStateProvider.overrideWithValue(
+          GroupsState(value: [_group('A'), _group('B')]),
+        ),
+        proxiesActionProvider.overrideWith(() => actions),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    final key = await pumpTabView(tester, container: container);
+    await tester.pumpAndSettle();
+    final state = key.currentState;
+    final page = tester.state(find.byType(TabBarView));
+    final controller = tester
+        .widget<GroupTabs>(find.byType(GroupTabs))
+        .controller;
+    final tabs = tester.element(find.byType(GroupTabs));
+    expect(state?.currentGroup?.name, 'B');
+
+    for (final profile in [second, first]) {
+      container
+          .read(currentProfileIdProvider.notifier)
+          .update((_) => profile.id);
+      await tester.pumpAndSettle();
+
+      expect(key.currentState, same(state));
+      expect(tester.state(find.byType(TabBarView)), same(page));
+      expect(tester.element(find.byType(GroupTabs)), same(tabs));
+      expect(
+        tester.widget<GroupTabs>(find.byType(GroupTabs)).controller,
+        same(controller),
+      );
+      expect(state?.currentGroup?.name, profile.currentGroupName);
+      expect(isTabSelected(tester, profile.currentGroupName!), isTrue);
+      expect(
+        container.read(currentProfileProvider)?.currentGroupName,
+        profile.currentGroupName,
+      );
+      final testing = container.read(delayTestingGroupsProvider.notifier);
+      testing.start(profile.currentGroupName!);
+      expect(container.read(currentGroupDelayTestingProvider), isTrue);
+      await state!.delayTestCurrentGroup();
+      expect(actions.tested.last, profile.currentGroupName);
+      testing.stop(profile.currentGroupName!);
+    }
+    expect(actions.tested, ['A', 'B']);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a swipe between pages moves the selected tab', (tester) async {

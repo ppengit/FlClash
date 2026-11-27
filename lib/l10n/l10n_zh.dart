@@ -27,10 +27,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get proxies => '代理';
 
   @override
-  String get profile => '配置';
+  String get profile => '配置文件';
 
   @override
-  String get profiles => '配置';
+  String get profiles => '订阅';
 
   @override
   String get tools => '工具';
@@ -105,7 +105,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get expireTime => '到期时间';
 
   @override
-  String get nullProfileDesc => '添加一个配置文件后即可开始使用';
+  String get nullProfileDesc => '添加订阅、导入配置文件或创建自定义配置后即可开始使用';
 
   @override
   String get settings => '设置';
@@ -252,10 +252,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get rename => '重命名';
 
   @override
-  String get profileUrlNullValidationDesc => '请输入配置URL';
+  String get profileUrlNullValidationDesc => '请输入订阅链接';
 
   @override
-  String get profileUrlInvalidValidationDesc => '请输入有效配置URL';
+  String get profileUrlInvalidValidationDesc => '请输入有效的订阅链接';
 
   @override
   String get autoUpdate => '自动更新';
@@ -329,7 +329,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String createProfileFromUrlTip(Object url) {
-    return '是否要通过 $url 创建配置？';
+    return '是否要添加订阅 $url？';
   }
 
   @override
@@ -834,6 +834,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get columns => '列数';
 
   @override
+  String get visibleColumns => '显示列';
+
+  @override
+  String get groupByProcess => '按进程分组';
+
+  @override
+  String get expandAll => '全部展开';
+
+  @override
+  String get collapseAll => '全部折叠';
+
+  @override
+  String get downloadSpeed => '下载速度';
+
+  @override
+  String get uploadSpeed => '上传速度';
+
+  @override
   String get proxyGroup => '策略组';
 
   @override
@@ -924,7 +942,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loose => '宽松';
 
   @override
-  String get profilesSort => '配置排序';
+  String get profilesSort => '订阅排序';
 
   @override
   String get start => '启动';
@@ -1144,7 +1162,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get actionDelayTest => '测试全部延迟';
 
   @override
-  String get actionUpdateProfiles => '更新全部配置';
+  String get actionUpdateProfiles => '更新全部订阅';
 
   @override
   String get disclaimer => '免责声明';
@@ -2005,7 +2023,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resetPageChangesTip => '当前页面存在更改，确定重置吗？';
 
   @override
-  String get customProfile => '自定义';
+  String get customProfile => '自定义配置';
 
   @override
   String get customResources => '自定义';
@@ -2084,7 +2102,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get restoreAllData => '恢复所有数据';
 
   @override
-  String get addProfile => '添加配置';
+  String get addProfile => '添加订阅';
 
   @override
   String get delayTest => '延迟测试';
@@ -2696,7 +2714,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get retry => '重试';
 
   @override
-  String get invalidProfileQrcode => '该二维码不包含配置文件链接';
+  String get invalidProfileQrcode => '该二维码不包含订阅或代理分享链接';
 
   @override
   String get dnsQueries => 'DNS查询';
@@ -2874,7 +2892,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extraLarge => '超大';
 
   @override
-  String get switchProfile => '切换配置';
+  String get switchProfile => '切换订阅';
 
   @override
   String get lastUpdated => '上次更新';

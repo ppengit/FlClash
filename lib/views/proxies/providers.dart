@@ -103,6 +103,9 @@ class ProviderItem extends ConsumerStatefulWidget {
 
   const ProviderItem({super.key, required this.provider});
 
+  @visibleForTesting
+  static File Function(String path) fileForProbe = File.new;
+
   @override
   ConsumerState<ProviderItem> createState() => _ProviderItemState();
 }
@@ -110,6 +113,7 @@ class ProviderItem extends ConsumerStatefulWidget {
 class _ProviderItemState extends ConsumerState<ProviderItem> {
   _ProviderFile _file = _ProviderFile.binary;
   bool _isAppRuleSet = false;
+  int _fileProbeGeneration = 0;
 
   ExternalProvider get provider => widget.provider;
 
@@ -125,19 +129,30 @@ class _ProviderItemState extends ConsumerState<ProviderItem> {
   void didUpdateWidget(covariant ProviderItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.provider.path != provider.path ||
-        oldWidget.provider.updateAt != provider.updateAt) {
+        oldWidget.provider.updateAt != provider.updateAt ||
+        oldWidget.provider.type != provider.type ||
+        oldWidget.provider.vehicleType != provider.vehicleType) {
       unawaited(_probeFile());
     }
   }
 
   Future<void> _probeFile() async {
+    final provider = this.provider;
+    final generation = ++_fileProbeGeneration;
+    _file = _ProviderFile.binary;
+    _isAppRuleSet = false;
     final clashProvidersAction = ref.read(
       clashProvidersActionProvider.notifier,
     );
     final file = await _probeProviderFile(provider.path);
+    if (!mounted || generation != _fileProbeGeneration) {
+      return;
+    }
     final isAppRuleSet =
         await clashProvidersAction.remoteProviderOf(provider) != null;
-    if (!mounted || (file == _file && isAppRuleSet == _isAppRuleSet)) {
+    if (!mounted ||
+        generation != _fileProbeGeneration ||
+        (file == _file && isAppRuleSet == _isAppRuleSet)) {
       return;
     }
     setState(() {
@@ -386,7 +401,7 @@ Future<_ProviderFile> _probeProviderFile(String? path) async {
     return _ProviderFile.binary;
   }
   try {
-    final file = File(path);
+    final file = ProviderItem.fileForProbe(path);
     if (!await file.exists()) {
       return _ProviderFile.text;
     }

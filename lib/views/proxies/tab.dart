@@ -42,6 +42,16 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
         _updateTabController(groupNames.length, index);
       }
     }, fireImmediately: true);
+    ref.listenManual(currentProfileProvider, (prev, next) {
+      if (prev?.id == next?.id) {
+        return;
+      }
+      final state = ref.read(proxiesTabControllerStateProvider);
+      _updateTabController(
+        state.groupNames.length,
+        state.groupNames.indexOf(next?.currentGroupName ?? ''),
+      );
+    });
   }
 
   @override
@@ -122,8 +132,11 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     if (group == null) {
       return;
     }
+    final profileId = ref.read(currentProfileIdProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+      if (!mounted ||
+          ref.read(currentProfileIdProvider) != profileId ||
+          currentGroup?.name != group.name) {
         return;
       }
       ref
@@ -144,8 +157,17 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     if (length == 0) {
       return;
     }
-    _destroyTabController();
     final realIndex = index == -1 ? 0 : index;
+    final previous = _tabController;
+    if (previous != null && previous.length == length) {
+      if (previous.index != realIndex) {
+        previous.index = realIndex;
+      } else {
+        _tabControllerListener(realIndex);
+      }
+      return;
+    }
+    _destroyTabController();
     final controller = TabController(
       length: length,
       initialIndex: realIndex,

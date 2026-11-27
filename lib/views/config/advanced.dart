@@ -79,34 +79,36 @@ class AdvancedConfigView extends ConsumerWidget {
     return Scaffold(
       title: appLocalizations.advancedConfig,
       isLoading: ref.watch(loadingProvider(LoadingTag.mitm)),
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(items: items),
-          generateSection(
-            title: appLocalizations.customResources,
-            items: customItems,
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
           ),
-          if (rsFeature)
+          children: [
+            generateSection(items: items),
             generateSection(
-              title: appLocalizations.mitm,
-              footer: isAndroid ? appLocalizations.mitmAndroidRootDesc : null,
-              last: true,
-              items: [
-                const MitmEnableItem(),
-                const MitmModulesItem(),
-                const MitmHostnameItem(),
-                ListItem.open(
-                  title: Text(appLocalizations.options),
-                  leading: const GlyphIcon(AppGlyphs.sliders),
-                  widget: MitmOptionsView(isAndroid: isAndroid),
-                ),
-              ],
+              title: appLocalizations.customResources,
+              items: customItems,
             ),
-        ],
+            if (rsFeature)
+              generateSection(
+                title: appLocalizations.mitm,
+                footer: isAndroid ? appLocalizations.mitmAndroidRootDesc : null,
+                last: true,
+                items: [
+                  const MitmEnableItem(),
+                  const MitmModulesItem(),
+                  const MitmHostnameItem(),
+                  ListItem.open(
+                    title: Text(appLocalizations.options),
+                    leading: const GlyphIcon(AppGlyphs.sliders),
+                    widget: MitmOptionsView(isAndroid: isAndroid),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

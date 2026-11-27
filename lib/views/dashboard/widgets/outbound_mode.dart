@@ -138,7 +138,7 @@ class OutboundModeBar extends ConsumerWidget {
                         first: index == 0,
                         last: index == Mode.values.length - 1,
                         outer: outer,
-                        inner: 10,
+                        inner: outer,
                         background: DashboardColors.of(context).tone,
                         semanticLabel: item.label,
                         onTap: () => _changeMode(ref, item),

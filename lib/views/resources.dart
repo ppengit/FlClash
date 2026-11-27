@@ -190,82 +190,87 @@ class _ResourcesViewState extends ConsumerState<ResourcesView> {
           onPressed: _updateAll,
         ),
       ],
-      body: NullStatusSwitcher(
-        isLoading: resources == null,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: context.listInsets.page().copyWith(
-                top: context.sectionsTopPadding,
-                bottom: 16 + context.bottomInset,
-              ),
-              sliver: SliverMainAxisGroup(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: generateSection(
-                      items: [
-                        ListItem.toggle(
-                          title: Text(appLocalizations.autoUpdate),
-                          value: autoUpdate,
-                          onChanged: _updateAutoUpdate,
-                        ),
-                        if (autoUpdate)
-                          ListItem(
-                            title: Text(
-                              appLocalizations.resourceUpdateInterval,
-                            ),
-                            subtitle: Text(
-                              '$updateInterval ${appLocalizations.hours}',
-                            ),
-                            onTap: _updateInterval,
+      body: Builder(
+        builder: (context) => NullStatusSwitcher(
+          isLoading: resources == null,
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: context.listInsets.page().copyWith(
+                  top: context.sectionsTopPadding,
+                  bottom: 16 + context.bottomInset,
+                ),
+                sliver: SliverMainAxisGroup(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: generateSection(
+                        items: [
+                          ListItem.toggle(
+                            title: Text(appLocalizations.autoUpdate),
+                            value: autoUpdate,
+                            onChanged: _updateAutoUpdate,
                           ),
-                      ],
+                          if (autoUpdate)
+                            ListItem(
+                              title: Text(
+                                appLocalizations.resourceUpdateInterval,
+                              ),
+                              subtitle: Text(
+                                '$updateInterval ${appLocalizations.hours}',
+                              ),
+                              onTap: _updateInterval,
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: generateSection(
-                      title: appLocalizations.geoResources,
-                      items: [
-                        for (final geoResource in GeoResource.values)
-                          _GeoResourceItem(geoResource, preloaded: _fileInfos),
-                      ],
+                    SliverToBoxAdapter(
+                      child: generateSection(
+                        title: appLocalizations.geoResources,
+                        items: [
+                          for (final geoResource in GeoResource.values)
+                            _GeoResourceItem(
+                              geoResource,
+                              preloaded: _fileInfos,
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  generateSliverSection(
-                    title: appLocalizations.iconSets,
-                    items: iconSets,
-                    itemBuilder: (iconSet) =>
-                        _IconSetItem(iconSet, key: ValueKey(iconSet.id)),
-                  ),
-                  generateSliverSection(
-                    title: appLocalizations.ruleProviders,
-                    items: ruleProviders,
-                    itemBuilder: (provider) => _RuleProviderItem(
-                      provider,
-                      preloaded: _fileInfos,
-                      key: ValueKey(provider.id),
-                    ),
-                  ),
-                  generateSliverSection(
-                    title: appLocalizations.script,
-                    items: scripts,
-                    itemBuilder: (script) => _ScriptItem(
-                      script,
-                      preloaded: _fileInfos,
-                      key: ValueKey(script.id),
-                    ),
-                  ),
-                  if (rsFeature)
                     generateSliverSection(
-                      title: appLocalizations.mitmModules,
-                      items: modules,
-                      itemBuilder: (module) =>
-                          _ModuleItem(module, key: ValueKey(module.id)),
+                      title: appLocalizations.iconSets,
+                      items: iconSets,
+                      itemBuilder: (iconSet) =>
+                          _IconSetItem(iconSet, key: ValueKey(iconSet.id)),
                     ),
-                ],
+                    generateSliverSection(
+                      title: appLocalizations.ruleProviders,
+                      items: ruleProviders,
+                      itemBuilder: (provider) => _RuleProviderItem(
+                        provider,
+                        preloaded: _fileInfos,
+                        key: ValueKey(provider.id),
+                      ),
+                    ),
+                    generateSliverSection(
+                      title: appLocalizations.script,
+                      items: scripts,
+                      itemBuilder: (script) => _ScriptItem(
+                        script,
+                        preloaded: _fileInfos,
+                        key: ValueKey(script.id),
+                      ),
+                    ),
+                    if (rsFeature)
+                      generateSliverSection(
+                        title: appLocalizations.mitmModules,
+                        items: modules,
+                        itemBuilder: (module) =>
+                            _ModuleItem(module, key: ValueKey(module.id)),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

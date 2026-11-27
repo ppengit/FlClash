@@ -133,7 +133,7 @@ class ProfilesCard extends ConsumerWidget {
       ],
     );
     return DashboardCard(
-      semanticLabel: appLocalizations.profile,
+      semanticLabel: appLocalizations.profiles,
       onTap: mobile || profile == null
           ? () => _openProfile(context, profile)
           : null,
@@ -143,7 +143,7 @@ class ProfilesCard extends ConsumerWidget {
         children: [
           DashboardCardHeader(
             glyph: AppGlyphs.profiles,
-            title: appLocalizations.profile,
+            title: appLocalizations.profiles,
             chevron: mobile,
             trailing: [
               if (mobile)

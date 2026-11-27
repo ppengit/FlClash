@@ -1710,6 +1710,42 @@ abstract class AppLocalizations {
   /// **'Columns'**
   String get columns;
 
+  /// No description provided for @visibleColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get visibleColumns;
+
+  /// No description provided for @groupByProcess.
+  ///
+  /// In en, this message translates to:
+  /// **'Group by process'**
+  String get groupByProcess;
+
+  /// No description provided for @expandAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand all'**
+  String get expandAll;
+
+  /// No description provided for @collapseAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse all'**
+  String get collapseAll;
+
+  /// No description provided for @downloadSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download speed'**
+  String get downloadSpeed;
+
+  /// No description provided for @uploadSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload speed'**
+  String get uploadSpeed;
+
   /// No description provided for @proxyGroup.
   ///
   /// In en, this message translates to:

@@ -21,34 +21,36 @@ class ThemeView extends StatelessWidget {
     final appLocalizations = context.appLocalizations;
     return BaseScaffold(
       title: appLocalizations.theme,
-      body: ListView(
-        padding: EdgeInsets.only(
-          top: context.appBarInset,
-          bottom: 32 + context.bottomInset,
-        ),
-        children: [
-          const ThemeLivePreview(),
-          const SizedBox(height: infoSectionSpacing),
-          const _ThemeModeItem(),
-          const SizedBox(height: infoSectionSpacing),
-          const _PureBlackItem(),
-          const SizedBox(height: infoSectionSpacing),
-          const _PrimaryColorItem(),
-          const SizedBox(height: infoSectionSpacing),
-          const _NavigationBarItem(),
-          const SizedBox(height: infoSectionSpacing),
-          const _TabAnimationItem(),
-          const SizedBox(height: infoSectionSpacing),
-          const _LiquidGlassItem(),
-          const SizedBox(height: infoSectionSpacing),
-          if (system.isMacOS || system.isWindows) ...const [
-            _SidebarBlurItem(),
-            SizedBox(height: infoSectionSpacing),
+      body: Builder(
+        builder: (context) => ListView(
+          padding: EdgeInsets.only(
+            top: context.appBarInset,
+            bottom: 32 + context.bottomInset,
+          ),
+          children: [
+            const ThemeLivePreview(),
+            const SizedBox(height: infoSectionSpacing),
+            const _ThemeModeItem(),
+            const SizedBox(height: infoSectionSpacing),
+            const _PureBlackItem(),
+            const SizedBox(height: infoSectionSpacing),
+            const _PrimaryColorItem(),
+            const SizedBox(height: infoSectionSpacing),
+            const _NavigationBarItem(),
+            const SizedBox(height: infoSectionSpacing),
+            const _TabAnimationItem(),
+            const SizedBox(height: infoSectionSpacing),
+            const _LiquidGlassItem(),
+            const SizedBox(height: infoSectionSpacing),
+            if (system.isMacOS || system.isWindows) ...const [
+              _SidebarBlurItem(),
+              SizedBox(height: infoSectionSpacing),
+            ],
+            const _FontFamilyItem(),
+            const SizedBox(height: infoSectionSpacing),
+            const _TextScaleFactorItem(),
           ],
-          const _FontFamilyItem(),
-          const SizedBox(height: infoSectionSpacing),
-          const _TextScaleFactorItem(),
-        ],
+        ),
       ),
     );
   }

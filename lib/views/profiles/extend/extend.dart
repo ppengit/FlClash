@@ -137,21 +137,23 @@ class _ExtendViewState extends ConsumerState<ExtendView> {
               child: Text(appLocalizations.applyNow),
             ),
         ],
-        body: NullStatusSwitcher(
-          isLoading: inputs == null,
-          child: ScrollConfiguration(
-            behavior: const ShowBarScrollBehavior(),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: SizedBox(height: context.sectionsTopPadding),
-                ),
-                const ScriptContent(),
-                const AddedRulesContent(),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: context.bottomInset),
-                ),
-              ],
+        body: Builder(
+          builder: (context) => NullStatusSwitcher(
+            isLoading: inputs == null,
+            child: ScrollConfiguration(
+              behavior: const ShowBarScrollBehavior(),
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: context.sectionsTopPadding),
+                  ),
+                  const ScriptContent(),
+                  const AddedRulesContent(),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: context.bottomInset),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -168,6 +168,26 @@ void main() {
       }
     });
 
+    test('requests table preferences default safely and round-trip', () {
+      final defaults = AppSettingProps.fromJson({});
+      expect(defaults.requestsGroupByProcess, isTrue);
+      expect(defaults.requestsColumns, contains('destination'));
+      expect(defaults.requestsSortColumn, isNull);
+      expect(defaults.requestsSortDescending, isFalse);
+      const props = AppSettingProps(
+        requestsSplitView: false,
+        requestsGroupByProcess: false,
+        requestsColumns: ['destination', 'status', 'download'],
+        requestsSortColumn: 'download',
+        requestsSortDescending: true,
+        tableColumnWidths: {
+          'requests': {'destination': 320, 'download': 100},
+        },
+      );
+      final restored = roundTrip(props.toJson, AppSettingProps.fromJson);
+      expect(restored, props);
+    });
+
     test('a saved outboundModeV2 card folds into outboundMode', () {
       final restored = AppSettingProps.fromJson({
         'dashboardWidgets': ['networkSpeed', 'outboundModeV2', 'outboundMode'],

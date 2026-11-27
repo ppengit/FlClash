@@ -107,27 +107,31 @@ class DeveloperView extends ConsumerWidget {
     );
     return BaseScaffold(
       title: appLocalizations.developerMode,
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(
-            items: [
-              ListItem.toggle(
-                title: Text(appLocalizations.developerMode),
-                value: enable,
-                onChanged: (value) {
-                  ref
-                      .read(appSettingProvider.notifier)
-                      .update((state) => state.copyWith(developerMode: value));
-                },
-              ),
-            ],
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
           ),
-          _getDeveloperList(context, ref),
-        ],
+          children: [
+            generateSection(
+              items: [
+                ListItem.toggle(
+                  title: Text(appLocalizations.developerMode),
+                  value: enable,
+                  onChanged: (value) {
+                    ref
+                        .read(appSettingProvider.notifier)
+                        .update(
+                          (state) => state.copyWith(developerMode: value),
+                        );
+                  },
+                ),
+              ],
+            ),
+            _getDeveloperList(context, ref),
+          ],
+        ),
       ),
     );
   }

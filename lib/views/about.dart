@@ -65,106 +65,110 @@ class AboutView extends ConsumerWidget {
     return Scaffold(
       isLoading: isLoading,
       title: appLocalizations.about,
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.contentTopPadding,
-          bottom: 32 + context.bottomInset,
-        ),
-        children: [
-          _AboutHero(
-            isCheckingUpdate: isLoading,
-            onCheckUpdate: () {
-              _checkUpdate(context, ref);
-            },
-            onEnterDeveloperMode: () {
-              ref
-                  .read(appSettingProvider.notifier)
-                  .update((state) => state.copyWith(developerMode: true));
-              dialogs.showBanner(
-                appLocalizations.developerModeEnableTip,
-                level: BannerLevel.success,
-              );
-            },
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.contentTopPadding,
+            bottom: 32 + context.bottomInset,
           ),
-          const SizedBox(height: 8),
-          generateSection(
-            title: appLocalizations.update,
-            items: [
-              ConfigToggleItem(
-                leading: const _GlyphBadge(glyph: AppGlyphs.autoCheckUpdate),
-                minHeight: badgeRowHeight,
-                title: (l) => l.autoCheckUpdate,
-                selector: appSettingProvider.select(
-                  (state) => state.autoCheckUpdate,
-                ),
-                onChanged: (ref, value) => ref
+          children: [
+            _AboutHero(
+              isCheckingUpdate: isLoading,
+              onCheckUpdate: () {
+                _checkUpdate(context, ref);
+              },
+              onEnterDeveloperMode: () {
+                ref
                     .read(appSettingProvider.notifier)
-                    .update((state) => state.copyWith(autoCheckUpdate: value)),
-              ),
-              ConfigOptionsItem<UpdateChannel>(
-                leading: const _GlyphBadge(glyph: AppGlyphs.updateChannel),
-                minHeight: badgeRowHeight,
-                title: (l) => l.updateChannel,
-                options: UpdateChannel.values,
-                textBuilder: (channel) => channel.label,
-                selector: appSettingProvider.select(
-                  (state) => state.updateChannel,
+                    .update((state) => state.copyWith(developerMode: true));
+                dialogs.showBanner(
+                  appLocalizations.developerModeEnableTip,
+                  level: BannerLevel.success,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            generateSection(
+              title: appLocalizations.update,
+              items: [
+                ConfigToggleItem(
+                  leading: const _GlyphBadge(glyph: AppGlyphs.autoCheckUpdate),
+                  minHeight: badgeRowHeight,
+                  title: (l) => l.autoCheckUpdate,
+                  selector: appSettingProvider.select(
+                    (state) => state.autoCheckUpdate,
+                  ),
+                  onChanged: (ref, value) => ref
+                      .read(appSettingProvider.notifier)
+                      .update(
+                        (state) => state.copyWith(autoCheckUpdate: value),
+                      ),
                 ),
-                onChanged: (ref, value) => ref
-                    .read(appSettingProvider.notifier)
-                    .update((state) => state.copyWith(updateChannel: value)),
-              ),
-            ],
-          ),
-          generateSection(
-            title: appLocalizations.more,
-            items: [
-              _buildLinkItem(
-                glyph: AppGlyphs.code,
-                title: appLocalizations.project,
-                url: 'https://github.com/$repository',
-                label: 'github.com/$repository',
-              ),
-              _buildLinkItem(
-                glyph: AppGlyphs.cpu,
-                title: appLocalizations.core,
-                url: 'https://github.com/chen08209/Clash.Meta/tree/FlClash',
-                label: 'github.com/chen08209/Clash.Meta',
-              ),
-              _buildLinkItem(
-                glyph: AppGlyphs.send,
-                title: 'Telegram',
-                url: 'https://t.me/FlClash',
-                label: 't.me/FlClash',
-              ),
-            ],
-          ),
-          generateSection(
-            title: appLocalizations.otherContributors,
-            items: [
-              for (final contributor in _contributors)
-                ListItem(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    foregroundDecoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      image: DecorationImage(
-                        image: AssetImage(contributor.avatar),
-                        fit: BoxFit.cover,
+                ConfigOptionsItem<UpdateChannel>(
+                  leading: const _GlyphBadge(glyph: AppGlyphs.updateChannel),
+                  minHeight: badgeRowHeight,
+                  title: (l) => l.updateChannel,
+                  options: UpdateChannel.values,
+                  textBuilder: (channel) => channel.label,
+                  selector: appSettingProvider.select(
+                    (state) => state.updateChannel,
+                  ),
+                  onChanged: (ref, value) => ref
+                      .read(appSettingProvider.notifier)
+                      .update((state) => state.copyWith(updateChannel: value)),
+                ),
+              ],
+            ),
+            generateSection(
+              title: appLocalizations.more,
+              items: [
+                _buildLinkItem(
+                  glyph: AppGlyphs.code,
+                  title: appLocalizations.project,
+                  url: 'https://github.com/$repository',
+                  label: 'github.com/$repository',
+                ),
+                _buildLinkItem(
+                  glyph: AppGlyphs.cpu,
+                  title: appLocalizations.core,
+                  url: 'https://github.com/chen08209/Clash.Meta/tree/FlClash',
+                  label: 'github.com/chen08209/Clash.Meta',
+                ),
+                _buildLinkItem(
+                  glyph: AppGlyphs.send,
+                  title: 'Telegram',
+                  url: 'https://t.me/FlClash',
+                  label: 't.me/FlClash',
+                ),
+              ],
+            ),
+            generateSection(
+              title: appLocalizations.otherContributors,
+              items: [
+                for (final contributor in _contributors)
+                  ListItem(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      foregroundDecoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          image: AssetImage(contributor.avatar),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.colorScheme.primaryContainer,
                       ),
                     ),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: context.colorScheme.primaryContainer,
-                    ),
+                    title: Text(contributor.name),
+                    subtitle: Text(appLocalizations.appIconDesign),
                   ),
-                  title: Text(contributor.name),
-                  subtitle: Text(appLocalizations.appIconDesign),
-                ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

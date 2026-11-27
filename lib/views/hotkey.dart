@@ -106,22 +106,24 @@ class HotKeyView extends StatelessWidget {
     final labels = ShortcutLabels.host();
     return BaseScaffold(
       title: appLocalizations.hotkeyManagement,
-      body: ListView(
-        padding: context.listInsets.page().copyWith(
-          top: context.contentTopPadding,
-          bottom: 20 + context.bottomInset,
+      body: Builder(
+        builder: (context) => ListView(
+          padding: context.listInsets.page().copyWith(
+            top: context.contentTopPadding,
+            bottom: 20 + context.bottomInset,
+          ),
+          children: [
+            const _HotKeyIntro(),
+            for (final (title, actions) in _sections(appLocalizations))
+              generateSection(
+                title: title,
+                items: [
+                  for (final action in actions)
+                    _HotKeyItem(action: action, labels: labels),
+                ],
+              ),
+          ],
         ),
-        children: [
-          const _HotKeyIntro(),
-          for (final (title, actions) in _sections(appLocalizations))
-            generateSection(
-              title: title,
-              items: [
-                for (final action in actions)
-                  _HotKeyItem(action: action, labels: labels),
-              ],
-            ),
-        ],
       ),
     );
   }
@@ -356,10 +358,26 @@ class _HotKeyRecorderState extends ConsumerState<HotKeyRecorder> {
     };
   }
 
+  bool _isDialogNavigation(KeyEvent event) {
+    final key = event.physicalKey;
+    final modifiers = _heldModifiers(except: key);
+    if (key == PhysicalKeyboardKey.tab) {
+      return modifiers.isEmpty ||
+          isValidHotKey(_modifiers, _key) &&
+              modifiers.length == 1 &&
+              modifiers.contains(KeyboardModifier.shift);
+    }
+    return modifiers.isEmpty &&
+        (key == PhysicalKeyboardKey.enter ||
+            key == PhysicalKeyboardKey.numpadEnter ||
+            key == PhysicalKeyboardKey.space);
+  }
+
   bool _handleKeyEvent(KeyEvent event) {
     final physicalKey = event.physicalKey;
+    if (_isDialogNavigation(event)) return false;
     if (isModifierKey(physicalKey)) {
-      if (event is KeyDownEvent || (event is KeyUpEvent && _key == null)) {
+      if (_key == null && (event is KeyDownEvent || event is KeyUpEvent)) {
         setState(() {
           _key = null;
           _modifiers = _heldModifiers();
@@ -489,9 +507,9 @@ class _HotKeyRecorderState extends ConsumerState<HotKeyRecorder> {
       conflict: conflict,
     );
     return Focus(
-      onKeyEvent: (_, _) {
-        return KeyEventResult.handled;
-      },
+      onKeyEvent: (_, event) => _isDialogNavigation(event)
+          ? KeyEventResult.ignored
+          : KeyEventResult.handled,
       autofocus: true,
       child: AlertDialog(
         title: widget.hotKeyAction.action.label,
