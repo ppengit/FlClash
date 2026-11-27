@@ -561,12 +561,14 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     required bool offersCapture,
     required bool requestsSplitView,
     required double maxWidth,
+    required double pageWidth,
   }) {
     final l10n = context.appLocalizations;
     final mobile = ViewScope.isMobileOf(context);
     final table =
         !mobile &&
         !requestsSplitView &&
+        pageWidth >= 640 &&
         _segment == RequestsSegment.connections;
     final grouped = ref.watch(
       appSettingProvider.select((state) => state.requestsGroupByProcess),
@@ -874,6 +876,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
                   offersCapture: offersCapture,
                   requestsSplitView: requestsSplitView,
                   maxWidth: 720,
+                  pageWidth: width,
                 ),
               ],
             ),

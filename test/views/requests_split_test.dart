@@ -88,7 +88,7 @@ void main() {
 
   Future<void> close(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
   }
 
   testWidgets('drag changes locally and saves once at drag end', (
@@ -98,6 +98,8 @@ void main() {
     final listState = listKey.currentState;
     final before = tester.getRect(find.byKey(listKey));
     final gesture = await tester.startGesture(tester.getCenter(handle()));
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(80, 0));
     await tester.pump();
 
@@ -121,6 +123,8 @@ void main() {
   ) async {
     await pumpSplit(tester);
     var gesture = await tester.startGesture(tester.getCenter(handle()));
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(1000, 0));
     await gesture.up();
     await tester.pump();
@@ -131,6 +135,8 @@ void main() {
     );
 
     gesture = await tester.startGesture(tester.getCenter(handle()));
+    await gesture.moveBy(const Offset(-20, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(-1000, 0));
     await tester.pump();
     expect(
@@ -169,6 +175,8 @@ void main() {
   testWidgets('a reopened split restores the persisted width', (tester) async {
     await pumpSplit(tester);
     final gesture = await tester.startGesture(tester.getCenter(handle()));
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(55, 0));
     await gesture.up();
     await tester.pump();
@@ -187,6 +195,8 @@ void main() {
   ) async {
     await pumpSplit(tester, rtl: true);
     final gesture = await tester.startGesture(tester.getCenter(handle()));
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(50, 0));
     await gesture.up();
     await tester.pump();

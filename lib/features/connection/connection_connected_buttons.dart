@@ -70,11 +70,11 @@ class ConnectedFilterButtons<T extends Object> extends StatelessWidget {
                       return MergeSemantics(
                         child: Semantics(
                           label: label,
+                          button: true,
                           selected: selected,
                           inMutuallyExclusiveGroup: inMutuallyExclusiveGroup,
                           child: Tooltip(
                             message: label,
-                            excludeFromSemantics: true,
                             child: PressSurface(
                               fill: selected ? colorScheme.primary : fill,
                               foreground: selected

@@ -393,7 +393,7 @@ void main() {
 
     final floor = sheetTop(tester);
     final gesture = await tester.startGesture(
-      Offset(_mobileSize.width / 2, floor + sheetAppBarHeight / 2),
+      Offset(_mobileSize.width / 2, floor + 12),
     );
     await gesture.moveBy(const Offset(0, 140));
     await tester.pump();

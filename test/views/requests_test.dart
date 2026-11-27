@@ -2235,15 +2235,32 @@ void main() {
                         )
                         .rows
                     as ConnectionRows;
+          void resume() {
+            if (tester.binding.lifecycleState == AppLifecycleState.resumed) {
+              return;
+            }
+            for (final state in [
+              AppLifecycleState.hidden,
+              AppLifecycleState.inactive,
+              AppLifecycleState.resumed,
+            ]) {
+              tester.binding.handleAppLifecycleStateChanged(state);
+            }
+          }
+
           if (background) {
-            tester.binding.handleAppLifecycleStateChanged(
+            for (final state in [
+              AppLifecycleState.inactive,
+              AppLifecycleState.hidden,
               AppLifecycleState.paused,
-            );
-            addTearDown(
-              () => tester.binding.handleAppLifecycleStateChanged(
-                AppLifecycleState.resumed,
-              ),
-            );
+            ]) {
+              tester.binding.handleAppLifecycleStateChanged(state);
+            }
+            addTearDown(() {
+              if (tester.binding.lifecycleState == AppLifecycleState.paused) {
+                resume();
+              }
+            });
           } else {
             active.value = false;
           }
@@ -2276,9 +2293,7 @@ void main() {
 
           holdRead = true;
           if (background) {
-            tester.binding.handleAppLifecycleStateChanged(
-              AppLifecycleState.resumed,
-            );
+            resume();
           } else {
             active.value = true;
           }

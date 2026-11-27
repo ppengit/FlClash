@@ -398,9 +398,12 @@ void main() {
     await tester.pump();
     expect(controller.status, _Status.active);
     expect(focus.hasPrimaryFocus, isTrue);
-    final activeSemantics = tester.getSemantics(
-      find.bySemanticsLabel('Active(9)'),
+    final activeNode = tester.getSemantics(
+      find.ancestor(of: active, matching: find.byType(MergeSemantics)).first,
     );
+    expect(activeNode.mergeAllDescendantsIntoThisNode, isTrue);
+    final activeSemantics = activeNode.getSemanticsData();
+    expect(activeSemantics.label, 'Active(9)');
     expect(activeSemantics.flagsCollection.isButton, isTrue);
     expect(activeSemantics.flagsCollection.isSelected.toBoolOrNull(), isTrue);
     expect(activeSemantics.flagsCollection.isInMutuallyExclusiveGroup, isTrue);

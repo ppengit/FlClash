@@ -314,9 +314,8 @@ void main() {
     });
   }
 
-  testWidgets('the menu closes every open connection once that is confirmed', (
-    tester,
-  ) async {
+  testWidgets('the direct close button closes every open connection once '
+      'confirmed', (tester) async {
     whenConnections<ConnectionPoll>(
       core,
       () async => [_tracker(id: 'a', host: 'alpha.test')],
@@ -325,15 +324,22 @@ void main() {
 
     await pumpConnections(tester, width: 600);
     await pumpSettled(tester);
-    await tester.tap(
+    final close = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byTooltip('Close all active connections'),
+    );
+    expect(close, findsOneWidget);
+    expect(
       find.descendant(
         of: find.byType(AppBar),
         matching: find.byGlyph(AppGlyphs.more),
       ),
+      findsNothing,
     );
+    await tester.ensureVisible(close);
+    await tester.tap(close);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Close all active connections'));
-    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
     await tester.pumpAndSettle();
 

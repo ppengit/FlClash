@@ -285,11 +285,15 @@ void main() {
 
     expect(readCount, 1);
 
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump(const Duration(seconds: 4));
 
     expect(readCount, 1);
 
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
 
